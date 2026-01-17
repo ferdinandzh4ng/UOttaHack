@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './TaskViewModal.css';
 
-function TaskViewModal({ task, onClose }) {
+function TaskViewModal({ task, onClose, userRole = 'student' }) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   
   if (!task) return null;
@@ -164,11 +164,6 @@ function TaskViewModal({ task, onClose }) {
                         <p style={{ fontSize: '12px', marginTop: '4px' }}>imageUrl: {currentSlide?.imageUrl || 'undefined'}</p>
                       </div>
                     )}
-                    
-                    <div className="slide-script">
-                      <h3>Script</h3>
-                      <p>{currentSlide?.script || 'No script available'}</p>
-                    </div>
 
                     {currentSlide?.speechUrl && currentSlide.speechUrl.trim() !== '' ? (
                       <div className="slide-speech">

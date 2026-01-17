@@ -448,6 +448,7 @@ function ClassDetail() {
         <TaskViewModal
           task={selectedTask}
           onClose={handleCloseTaskView}
+          userRole={user?.role}
         />
       )}
 

@@ -325,25 +325,27 @@
 }
 
 .delete-btn {
-  background: #dc2626;
-  color: white;
+  background: none;
+  color: var(--text-secondary);
   border: none;
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   padding: 0;
   flex-shrink: 0;
+  opacity: 0.6;
 }
 
 .delete-btn:hover {
-  background: #b91c1c;
-  transform: scale(1.05);
+  background: var(--base-gray-50);
+  color: var(--text-primary);
+  opacity: 1;
 }
 
 .tasks-list {
@@ -413,6 +415,11 @@
 .task-status-completed {
   background: rgba(34, 197, 94, 0.1);
   color: #15803d;
+}
+
+.task-status-failed {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
 }
 
 .task-card-info {
