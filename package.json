@@ -18,7 +18,13 @@
     "mongoose": "^8.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "axios": "^1.6.2",
+    "redis": "^4.6.11",
+    "solclientjs": "^10.18.2",
+    "@sentry/node": "^7.91.0",
+    "@sentry/react": "^7.91.0",
+    "@aws-sdk/client-s3": "^3.490.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
