@@ -64,6 +64,11 @@ class VitalsService {
         },
         { timeout: 10000 }
       );
+      // Python service returns { success: true, metrics: {...} }
+      // Extract just the metrics object
+      if (response.data && response.data.metrics) {
+        return response.data.metrics;
+      }
       return response.data;
     } catch (error) {
       console.error('[VitalsService] Error processing frame:', error.message);

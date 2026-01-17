@@ -63,7 +63,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt \
         requests>=2.31.0 \
         opencv-python>=4.8.0 \
         numpy>=1.24.0 \
-        mediapipe==0.9.3.0 \
+        mediapipe>=0.10.0 \
         scipy>=1.10.0)
 
 # Copy SmartSpectra source (mounted via docker-compose)
@@ -105,6 +105,7 @@ RUN chmod +x /app/docker-entrypoint.sh
 COPY vitals_service.py .
 COPY heart_rate_monitor.py .
 COPY eye_tracker.py .
+COPY eye_tracker_simple.py .
 COPY custom_metrics_processor.py .
 COPY presage_wrapper.cpp build_wrapper.sh CMakeLists.txt ./
 

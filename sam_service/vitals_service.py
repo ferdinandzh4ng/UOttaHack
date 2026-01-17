@@ -284,27 +284,40 @@ class VitalsSession:
         return result
 
 
-def process_frame_with_presage(frame_data, api_key, custom_processor=None):
+def process_frame_with_custom_metrics(frame_data, custom_processor=None, api_key=None):
     """
-    Process a video frame using Presage SmartSpectra SDK.
-    Falls back to custom metrics if Presage fails or returns 0.
+    Process a video frame using custom metrics (eye tracking + heart rate).
+    Uses custom metrics as PRIMARY source for all metrics.
     
-    This function calls the C++ wrapper executable that interfaces with the Presage SDK.
-    Make sure you have:
-    1. Built the Presage SDK from source
-    2. Built the wrapper: ./build_wrapper.sh
-    3. The presage_wrapper executable is in the same directory or in PATH
+    Falls back to Presage only if custom metrics are unavailable.
     """
+    # Try custom metrics FIRST (primary source)
+    if custom_processor is not None:
+        try:
+            custom_vitals = custom_processor.process_frame(frame_data, time.time())
+            
+            if custom_vitals and (custom_vitals.get('heart_rate') is not None or custom_vitals.get('breathing_rate') is not None):
+                # Custom metrics available and working
+                print(f"✅ [CUSTOM] Using custom metrics: HR={custom_vitals.get('heart_rate')}, BR={custom_vitals.get('breathing_rate')}, Gaze={custom_vitals.get('gaze_direction')}")
+                custom_vitals['source'] = 'custom'
+                return custom_vitals
+            else:
+                print(f"⚠️ [CUSTOM] Custom metrics returned None/empty, trying Presage fallback")
+        except Exception as e:
+            print(f"❌ [CUSTOM] Custom metrics processing failed: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # Fallback to Presage if custom metrics unavailable
     import os
     import json
     
     # Auto-detect wrapper: Try Swift wrapper first (macOS), then C++ wrapper
-    # Swift wrapper is preferred on macOS, C++ wrapper works everywhere
     wrapper_paths = [
-        os.path.join(os.path.dirname(__file__), 'presage_wrapper'),  # Swift (macOS) or C++ (Linux)
-        os.path.join(os.path.dirname(__file__), 'presage_wrapper_cpp'),  # Explicit C++ wrapper
-        'presage_wrapper',  # System PATH
-        'presage_wrapper_cpp'  # System PATH C++ version
+        os.path.join(os.path.dirname(__file__), 'presage_wrapper'),
+        os.path.join(os.path.dirname(__file__), 'presage_wrapper_cpp'),
+        'presage_wrapper',
+        'presage_wrapper_cpp'
     ]
     
     wrapper_path = None
@@ -313,7 +326,7 @@ def process_frame_with_presage(frame_data, api_key, custom_processor=None):
             wrapper_path = path
             break
     
-    # Try Presage SDK first
+    # Try Presage SDK as fallback
     presage_vitals = None
     if wrapper_path and (os.path.exists(wrapper_path) or shutil.which(wrapper_path)):
         print(f"🔍 [DEBUG] Trying Presage wrapper at: {wrapper_path}")
@@ -365,84 +378,21 @@ def process_frame_with_presage(frame_data, api_key, custom_processor=None):
         print(f"⚠️ [PRESAGE] Wrapper not found. Tried paths: {', '.join(wrapper_paths)}")
         presage_vitals = None
     
-    # Check if Presage failed or returned 0 values
-    if presage_vitals is None:
-        presage_failed = True
-    else:
-        presage_failed = (
-            presage_vitals.get('heart_rate') is None or
-            presage_vitals.get('heart_rate') == 0 or
-            presage_vitals.get('breathing_rate') is None or
-            presage_vitals.get('breathing_rate') == 0
-        )
-    
-    # Debug logging
-    if presage_failed:
-        print(f"🔍 [DEBUG] Presage failed check: presage_vitals={presage_vitals}, custom_processor={'available' if custom_processor is not None else 'None'}")
-    
-    # Use custom metrics as fallback
-    if presage_failed and custom_processor is not None:
-        try:
-            print("🔄 [FALLBACK] Presage failed/returned 0, using custom metrics")
-            custom_vitals = custom_processor.process_frame(frame_data, time.time())
-            
-            if custom_vitals:
-                # Merge results: prefer Presage if available, fill gaps with custom
-                if presage_vitals is None:
-                    presage_vitals = {}
-                
-                # Use custom metrics for missing values
-                if presage_vitals.get('heart_rate') is None or presage_vitals.get('heart_rate') == 0:
-                    presage_vitals['heart_rate'] = custom_vitals.get('heart_rate')
-                
-                if presage_vitals.get('breathing_rate') is None or presage_vitals.get('breathing_rate') == 0:
-                    presage_vitals['breathing_rate'] = custom_vitals.get('breathing_rate')
-                
-                # Add custom metrics (eye tracking)
-                presage_vitals['gaze_direction'] = custom_vitals.get('gaze_direction')
-                presage_vitals['blink_rate'] = custom_vitals.get('blink_rate')
-                presage_vitals['eye_movement_stability'] = custom_vitals.get('eye_movement_stability')
-                presage_vitals['focus_duration'] = custom_vitals.get('focus_duration')
-                presage_vitals['signal_quality'] = custom_vitals.get('signal_quality', 0.0)
-                presage_vitals['overall_quality'] = custom_vitals.get('overall_quality', 0.0)
-                
-                # Update source
-                if presage_vitals.get('source') == 'presage':
-                    presage_vitals['source'] = 'hybrid'  # Both Presage and custom
-                else:
-                    presage_vitals['source'] = 'custom'  # Only custom
-                
-                print(f"✅ [FALLBACK] Custom metrics: HR={presage_vitals.get('heart_rate')}, BR={presage_vitals.get('breathing_rate')}, Gaze={presage_vitals.get('gaze_direction')}")
-                
-                return presage_vitals
-            else:
-                print(f"⚠️ [FALLBACK] Custom processor returned None/empty metrics")
-        except Exception as e:
-            print(f"❌ [FALLBACK] Custom metrics processing failed: {e}")
-            import traceback
-            traceback.print_exc()
-    
     # If Presage worked, return it
-    if not presage_failed:
+    if presage_vitals is not None and presage_vitals.get('heart_rate') and presage_vitals.get('breathing_rate'):
+        print(f"✅ [PRESAGE] Using Presage fallback: HR={presage_vitals.get('heart_rate')}, BR={presage_vitals.get('breathing_rate')}")
         return presage_vitals
     
-    # Final fallback: simulated data (only if both Presage and custom failed)
-    if presage_failed:
-        if custom_processor is None:
-            print(f"⚠️ [FALLBACK] Presage failed and custom metrics not available, using simulated data")
-            print(f"  Presage wrapper paths tried: {', '.join(wrapper_paths)}")
-            print(f"  Custom metrics not available (install mediapipe and scipy)")
-        else:
-            print(f"⚠️ [FALLBACK] Both Presage and custom metrics failed, using simulated data")
-            print(f"  Presage wrapper paths tried: {', '.join(wrapper_paths)}")
-        import random
-        return {
-            'heart_rate': random.uniform(65, 85),
-            'breathing_rate': random.uniform(14, 18),
-            'source': 'simulated'
-        }
-    
-    return None
+    # Final fallback: simulated data (only if both custom and Presage failed)
+    print(f"⚠️ [FALLBACK] Both custom and Presage metrics failed, using simulated data")
+    if custom_processor is None:
+        print(f"  Custom metrics not available (install mediapipe and scipy)")
+    import random
+    return {
+        'heart_rate': random.uniform(65, 85),
+        'breathing_rate': random.uniform(14, 18),
+        'source': 'simulated'
+    }
 
 
 @app.route('/health', methods=['GET'])
@@ -530,14 +480,13 @@ def process_frame():
             print(f"⚠️ [FRAME] Failed to decode frame (cv2.imdecode returned None) - Session: {session_id[:20]}...")
             return jsonify({'error': 'Invalid frame data: cv2.imdecode returned None'}), 400
         
-        # Process with Presage SDK (with custom metrics fallback)
+        # Process with custom metrics (primary) - Presage as fallback
         api_key = session.api_key
-        vitals = process_frame_with_presage(frame, api_key, custom_processor=session.custom_processor)
+        vitals = process_frame_with_custom_metrics(frame, custom_processor=session.custom_processor, api_key=api_key)
         
         # Log source of metrics
         source = vitals.get('source', 'unknown')
-        if source == 'custom' or source == 'hybrid':
-            print(f"📊 [FRAME] Using {source} metrics: HR={vitals.get('heart_rate', 'N/A')}, BR={vitals.get('breathing_rate', 'N/A')}, Gaze={vitals.get('gaze_direction', 'N/A')}")
+        print(f"📊 [FRAME] Using {source} metrics: HR={vitals.get('heart_rate', 'N/A')}, BR={vitals.get('breathing_rate', 'N/A')}, Gaze={vitals.get('gaze_direction', 'N/A')}")
         
         # Add to session and calculate derived metrics
         metric = session.add_metrics(

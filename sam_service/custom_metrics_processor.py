@@ -5,7 +5,22 @@ Coordinates eye tracking and heart rate monitoring to provide unified metrics.
 
 import time
 from heart_rate_monitor import HeartRateMonitor
-from eye_tracker import EyeTracker
+
+# Try to import eye tracker - fallback to simple version if MediaPipe API incompatible
+EyeTracker = None
+try:
+    from eye_tracker import EyeTracker as EyeTrackerMP
+    # Test if MediaPipe has solutions API (0.9.x has it, 0.10+ doesn't)
+    import mediapipe as mp
+    if hasattr(mp, 'solutions'):
+        EyeTracker = EyeTrackerMP
+    else:
+        # MediaPipe 0.10+ - use simple tracker
+        raise AttributeError("MediaPipe 0.10+ doesn't have solutions API")
+except (ImportError, AttributeError) as e:
+    # Fallback to simple eye tracker
+    print(f"⚠️ [CUSTOM] Using simple eye tracker (MediaPipe API incompatible): {e}")
+    from eye_tracker_simple import EyeTracker
 
 
 class CustomMetricsProcessor:
@@ -23,7 +38,18 @@ class CustomMetricsProcessor:
         """
         self.fps = fps
         self.heart_rate_monitor = HeartRateMonitor(fps=fps)
-        self.eye_tracker = EyeTracker()
+        
+        # Initialize eye tracker with error handling
+        try:
+            if EyeTracker is not None:
+                self.eye_tracker = EyeTracker()
+            else:
+                from eye_tracker_simple import EyeTracker as SimpleEyeTracker
+                self.eye_tracker = SimpleEyeTracker()
+        except Exception as e:
+            print(f"⚠️ [CUSTOM] Failed to initialize eye tracker, using simple version: {e}")
+            from eye_tracker_simple import EyeTracker as SimpleEyeTracker
+            self.eye_tracker = SimpleEyeTracker()
         
         self.frame_count = 0
         self.last_metrics = None
