@@ -1,0 +1,365 @@
+.class-detail {
+  width: 100%;
+  height: 100vh;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.class-detail-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 20px;
+  padding: 3rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+}
+
+.class-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.class-detail-header h1 {
+  color: #333;
+  font-size: 2.5rem;
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.back-btn {
+  background: #f5f5f5;
+  color: #333;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.3s;
+}
+
+.back-btn:hover {
+  background: #e0e0e0;
+}
+
+.logout-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.3s;
+}
+
+.logout-btn:hover {
+  background: #d32f2f;
+}
+
+.class-info {
+  background: #f5f5f5;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.class-info h2 {
+  color: #333;
+  font-size: 1.5rem;
+  margin: 0 0 1rem 0;
+}
+
+.class-info p {
+  color: #666;
+  margin: 0;
+}
+
+.class-code {
+  margin-top: 0.5rem;
+  color: #667eea;
+  font-size: 1rem;
+}
+
+.class-code strong {
+  font-size: 1.2rem;
+  letter-spacing: 2px;
+}
+
+.join-class-section {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.join-class-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.join-class-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.enrolled-badge {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 1rem;
+  border-radius: 10px;
+  text-align: center;
+  margin-bottom: 2rem;
+  font-weight: 600;
+}
+
+.students-section {
+  margin-bottom: 3rem;
+}
+
+.students-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.add-student-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.add-student-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.students-section h2 {
+  color: #333;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.no-students {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  background: #f5f5f5;
+  border-radius: 10px;
+}
+
+.students-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.student-card {
+  background: #f5f5f5;
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.student-card p {
+  color: #333;
+  font-weight: 600;
+  margin: 0;
+}
+
+.tasks-section {
+  margin-bottom: 2rem;
+}
+
+.tasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.tasks-header h2 {
+  color: #333;
+  font-size: 2rem;
+  margin: 0;
+}
+
+.create-task-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.create-task-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.no-tasks {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  background: #f5f5f5;
+  border-radius: 10px;
+}
+
+.tasks-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.task-card {
+  background: #f9f9f9;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-card:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  transform: translateY(-2px);
+}
+
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.task-card-header h3 {
+  color: #333;
+  font-size: 1.25rem;
+  margin: 0;
+  flex: 1;
+}
+
+.task-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.task-status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.task-status-generating {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.task-status-completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.task-status-failed {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.task-card-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.task-type {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.task-length,
+.task-slides,
+.task-questions,
+.task-variants {
+  color: #666;
+}
+
+.task-variants {
+  color: #667eea;
+  font-weight: 500;
+}
+
+.view-task-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-top: auto;
+}
+
+.view-task-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+@media (max-width: 768px) {
+  .class-detail-content {
+    padding: 2rem 1.5rem;
+  }
+  
+  .class-detail-header h1 {
+    font-size: 2rem;
+  }
+
+  .class-detail-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .back-btn,
+  .logout-btn {
+    width: 100%;
+  }
+}
+
