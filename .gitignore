@@ -14,6 +14,21 @@ dist-ssr
 
 .env
 
+# Uploads directory
+server/uploads/
+
+# Python virtual environment
+sam_service/.venv/
+sam_service/__pycache__/
+sam_service/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# SAM service environment
+sam_service/.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
