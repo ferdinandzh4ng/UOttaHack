@@ -218,6 +218,46 @@ function ClassDetail() {
     fetchStudents();
   };
 
+  const handleDeleteStudent = async (studentId) => {
+    if (window.confirm('Are you sure you want to remove this student from the class?')) {
+      try {
+        const response = await fetch(`/api/classes/${classId}/students/${studentId}`, {
+          method: 'DELETE'
+        });
+        const data = await response.json();
+        if (response.ok) {
+          console.log('Student removed successfully:', data);
+          // Refresh students list
+          fetchStudents();
+        } else {
+          console.error('Error removing student:', data.error);
+        }
+      } catch (error) {
+        console.error('Error removing student:', error);
+      }
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (window.confirm('Are you sure you want to delete this task?')) {
+      try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          method: 'DELETE'
+        });
+        const data = await response.json();
+        if (response.ok) {
+          console.log('Task deleted successfully:', data);
+          // Refresh tasks list
+          fetchTasks();
+        } else {
+          console.error('Error deleting task:', data.error);
+        }
+      } catch (error) {
+        console.error('Error deleting task:', error);
+      }
+    }
+  };
+
   if (!user || loading) {
     return (
       <div className="class-detail">
@@ -284,7 +324,19 @@ function ClassDetail() {
               <div className="students-list">
                 {students.map((student) => (
                   <div key={student.id} className="student-card">
-                    <p>{student.username}</p>
+                    <div className="card-content">
+                      <p>{student.username}</p>
+                    </div>
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteStudent(student.id);
+                      }}
+                      title="Remove student"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
@@ -293,58 +345,111 @@ function ClassDetail() {
         )}
 
         {(user?.role === 'educator' || (user?.role === 'student' && isEnrolled)) && (
-          <div className="tasks-section">
-            <div className="tasks-header">
-              <h2>Tasks</h2>
-              {user?.role === 'educator' && (
-                <button className="create-task-btn" onClick={handleCreateTask}>
-                  + Create Task
-                </button>
-              )}
-            </div>
-            {tasks.length === 0 ? (
-              <div className="no-tasks">
-                <p>No tasks available yet.</p>
-              </div>
-            ) : (
-              <div className="tasks-list">
-                {tasks.map((task) => (
-                  <div key={task.id} className="task-card">
-                    <div className="task-card-header">
-                      <h3>{task.topic}</h3>
-                      <span className={`task-status task-status-${task.type === 'Lesson' ? task.lessonData?.status : task.quizData?.status}`}>
-                        {task.type === 'Lesson' ? task.lessonData?.status || 'pending' : task.quizData?.status || 'pending'}
-                      </span>
-                    </div>
-                    <div className="task-card-info">
-                      <p className="task-type">{task.type}</p>
-                      {task.type === 'Lesson' && task.length && (
-                        <p className="task-length">{task.length} minutes</p>
-                      )}
-                      {task.type === 'Lesson' && task.lessonData?.slides && (
-                        <p className="task-slides">{task.lessonData.slides.length} slides</p>
-                      )}
-                      {task.type === 'Quiz' && task.quizData?.numQuestions && (
-                        <p className="task-questions">{task.quizData.numQuestions} questions</p>
-                      )}
-                      {task.variantCount > 0 && (
-                        <p className="task-variants">{task.variantCount} variant{task.variantCount !== 1 ? 's' : ''}</p>
-                      )}
-                    </div>
-                    {(task.type === 'Lesson' ? task.lessonData?.status === 'completed' : task.quizData?.status === 'completed') && (
-                      <button 
-                        className="view-task-btn" 
-                        onClick={() => handleViewTask(task)}
-                      >
-                        View {task.type === 'Lesson' ? 'Slides' : 'Quiz'}
-                      </button>
-                    )}
+          <div className="content-sections">
+            {user?.role === 'educator' && (
+              <div className="students-panel">
+                <div className="panel-header">
+                  <h2>Students</h2>
+                  <button className="add-student-btn" onClick={() => setShowAddStudentModal(true)}>
+                    + Add Student
+                  </button>
+                </div>
+                {students.length === 0 ? (
+                  <div className="no-content">
+                    <p>No students enrolled yet.</p>
                   </div>
-                ))}
+                ) : (
+                  <div className="students-list">
+                    {students.map((student) => (
+                      <div key={student.id} className="student-card">
+                        <div className="card-content">
+                          <p>{student.username}</p>
+                        </div>
+                        <button
+                          className="delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStudent(student.id);
+                          }}
+                          title="Remove student"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
+
+            <div className="tasks-panel">
+              <div className="panel-header">
+                <h2>Tasks</h2>
+                {user?.role === 'educator' && (
+                  <button className="create-task-btn" onClick={handleCreateTask}>
+                    + Create Task
+                  </button>
+                )}
+              </div>
+              {tasks.length === 0 ? (
+                <div className="no-content">
+                  <p>No tasks available yet.</p>
+                </div>
+              ) : (
+                <div className="tasks-list">
+                  {tasks.map((task) => (
+                    <div key={task.id} className="task-card">
+                      <div className="task-card-header">
+                        <h3>{task.topic}</h3>
+                        <div className="task-card-actions">
+                          {user?.role === 'educator' && (
+                            <button
+                              className="delete-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTask(task.id);
+                              }}
+                              title="Delete task"
+                            >
+                              ✕
+                            </button>
+                          )}
+                          <span className={`task-status task-status-${task.type === 'Lesson' ? task.lessonData?.status : task.quizData?.status}`}>
+                            {task.type === 'Lesson' ? task.lessonData?.status || 'pending' : task.quizData?.status || 'pending'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="task-card-info">
+                        <p className="task-type">{task.type}</p>
+                        {task.type === 'Lesson' && task.length && (
+                          <p className="task-length">{task.length} minutes</p>
+                        )}
+                        {task.type === 'Lesson' && task.lessonData?.slides && (
+                          <p className="task-slides">{task.lessonData.slides.length} slides</p>
+                        )}
+                        {task.type === 'Quiz' && task.quizData?.numQuestions && (
+                          <p className="task-questions">{task.quizData.numQuestions} questions</p>
+                        )}
+                        {task.variantCount > 0 && (
+                          <p className="task-variants">{task.variantCount} variant{task.variantCount !== 1 ? 's' : ''}</p>
+                        )}
+                      </div>
+                      {(task.type === 'Lesson' ? task.lessonData?.status === 'completed' : task.quizData?.status === 'completed') && (
+                        <button 
+                          className="view-task-btn" 
+                          onClick={() => handleViewTask(task)}
+                        >
+                          View {task.type === 'Lesson' ? 'Slides' : 'Quiz'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
+
       </div>
 
       {showCreateTaskModal && (

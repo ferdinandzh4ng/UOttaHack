@@ -9,6 +9,8 @@ function EducatorHomepage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [draggedClass, setDraggedClass] = useState(null);
+  const [trashHover, setTrashHover] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -54,6 +56,60 @@ function EducatorHomepage() {
     setShowCreateModal(false);
   };
 
+  const handleDragStart = (e, classId) => {
+    setDraggedClass(classId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedClass(null);
+    setTrashHover(false);
+  };
+
+  const handleTrashDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setTrashHover(true);
+  };
+
+  const handleTrashDragLeave = () => {
+    setTrashHover(false);
+  };
+
+  const handleTrashDrop = async (e) => {
+    e.preventDefault();
+    setTrashHover(false);
+    
+    if (draggedClass) {
+      if (window.confirm('Are you sure you want to delete this class?')) {
+        await deleteClass(draggedClass);
+      }
+    }
+    setDraggedClass(null);
+  };
+
+  const deleteClass = async (classId) => {
+    try {
+      const response = await fetch(`/api/classes/${classId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Refresh classes list
+        if (user) {
+          await fetchClasses(user.id);
+        }
+      } else {
+        console.error('Error deleting class:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error deleting class:', error);
+    }
+  };
+
   if (!user || loading) {
     return (
       <div className="educator-homepage">
@@ -81,7 +137,9 @@ function EducatorHomepage() {
         </div>
 
         <div className="classes-section">
-          <h2>My Classes</h2>
+          <div className="classes-header">
+            <h2>My Classes</h2>
+          </div>
           {classes.length === 0 ? (
             <div className="no-classes">
               <p>No classes yet. Create your first class to get started!</p>
@@ -94,11 +152,27 @@ function EducatorHomepage() {
                   className="class-card"
                   onClick={() => navigate(`/class/${classItem.id || classItem._id}`)}
                 >
-                  <h3>{classItem.subject}</h3>
-                  <p className="grade-level">Grade {classItem.gradeLevel}</p>
-                  <p className="created-date">
-                    Created {new Date(classItem.createdAt).toLocaleDateString()}
-                  </p>
+                  <div className="class-card-top">
+                    <div>
+                      <h3>{classItem.subject}</h3>
+                      <p className="grade-level">Grade {classItem.gradeLevel}</p>
+                      <p className="created-date">
+                        Created {new Date(classItem.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      className="class-delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Are you sure you want to delete this class?')) {
+                          deleteClass(classItem.id || classItem._id);
+                        }
+                      }}
+                      title="Delete class"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
