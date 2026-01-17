@@ -1,0 +1,141 @@
+# Solace AI Connector Configuration for UOttaHack
+# This configures the agents and their capabilities
+
+broker:
+  host: ${SOLACE_HOST:localhost}
+  port: ${SOLACE_PORT:8008}
+  vpn: ${SOLACE_VPN_NAME:default}
+  username: ${SOLACE_USERNAME:default}
+  password: ${SOLACE_PASSWORD:default}
+  client_name: uottahack-sam
+
+agents:
+  # Script Generation Agent - Generates lesson scripts
+  script_agent:
+    model:
+      provider: ${SCRIPT_PROVIDER:openai}
+      api_key: ${OPENAI_API_KEY:}
+      model: ${SCRIPT_MODEL:gpt-4}
+    instructions: |
+      You are an expert educational content creator. Generate engaging, educational lesson scripts 
+      that are well-structured and appropriate for classroom use. Break scripts into slides with 
+      approximately 2 minutes of content per slide.
+    tools:
+      - name: generate_lesson_script
+        description: Generate a lesson script divided into slides
+        parameters:
+          topic: string
+          length_minutes: number
+    topics:
+      subscribe: ["ai/task/script/lesson"]
+      publish: ["ai/task/script/lesson/response"]
+
+  # Image Generation Agent - Generates images for slides
+  image_agent:
+    model:
+      provider: ${IMAGE_PROVIDER:openai}
+      api_key: ${OPENAI_API_KEY:}
+      model: ${IMAGE_MODEL:dall-e-3}
+    instructions: |
+      You are an image generation specialist. Create educational illustrations that are clean, 
+      professional, and suitable for classroom presentations.
+    tools:
+      - name: generate_slide_image
+        description: Generate an image for a lesson slide
+        parameters:
+          slide_script: string
+          slide_number: number
+          topic: string
+    topics:
+      subscribe: ["ai/task/image/slide"]
+      publish: ["ai/task/image/slide/response"]
+
+  # Speech Generation Agent - Generates speech from text
+  speech_agent:
+    model:
+      provider: elevenlabs
+      api_key: ${ELEVENLABS_API_KEY:}
+    instructions: |
+      You are a text-to-speech specialist. Convert educational scripts into natural-sounding speech 
+      suitable for classroom presentations.
+    tools:
+      - name: generate_speech
+        description: Generate speech audio from text
+        parameters:
+          text: string
+          voice_id: string
+    topics:
+      subscribe: ["ai/task/speech/slide"]
+      publish: ["ai/task/speech/slide/response"]
+
+  # Quiz Prompt Generation Agent
+  quiz_prompt_agent:
+    model:
+      provider: ${QUIZ_PROVIDER:openai}
+      api_key: ${OPENAI_API_KEY:}
+      model: ${QUIZ_MODEL:gpt-4}
+    instructions: |
+      You are an expert educational content creator. Generate comprehensive quiz prompts that 
+      are detailed enough to generate high-quality educational questions.
+    tools:
+      - name: generate_quiz_prompt
+        description: Generate a quiz prompt for question generation
+        parameters:
+          topic: string
+          question_type: string
+          num_questions: number
+    topics:
+      subscribe: ["ai/task/quiz/prompt"]
+      publish: ["ai/task/quiz/prompt/response"]
+
+  # Quiz Questions Generation Agent
+  quiz_questions_agent:
+    model:
+      provider: ${QUIZ_PROVIDER:openai}
+      api_key: ${OPENAI_API_KEY:}
+      model: ${QUIZ_MODEL:gpt-4}
+    instructions: |
+      You are an expert educational content creator. Generate high-quality quiz questions 
+      with correct answers and explanations based on provided prompts.
+    tools:
+      - name: generate_quiz_questions
+        description: Generate quiz questions and answers
+        parameters:
+          quiz_prompt: string
+          topic: string
+          question_type: string
+          num_questions: number
+    topics:
+      subscribe: ["ai/task/quiz/questions"]
+      publish: ["ai/task/quiz/questions/response"]
+
+  # Orchestrator Agent - Routes tasks to appropriate agents
+  orchestrator:
+    model:
+      provider: ${ORCHESTRATOR_PROVIDER:openai}
+      api_key: ${OPENAI_API_KEY:}
+      model: ${ORCHESTRATOR_MODEL:gpt-4}
+    instructions: |
+      You are the orchestrator for the UOttaHack learning platform. Your job is to route 
+      AI tasks to the appropriate specialized agents:
+      - script_agent: For lesson script generation
+      - image_agent: For slide image generation
+      - speech_agent: For text-to-speech conversion
+      - quiz_prompt_agent: For quiz prompt generation
+      - quiz_questions_agent: For quiz question generation
+      
+      Route tasks based on the task type and delegate to the appropriate agent.
+    topics:
+      subscribe: ["ai/task/*"]
+      publish: ["ai/task/*/response"]
+
+gateways:
+  # REST API Gateway
+  rest_gateway:
+    type: rest
+    port: 5001
+    endpoints:
+      - path: /api/ai/task
+        method: POST
+        topic: "ai/task/request"
+

@@ -40,7 +40,11 @@ function AuthForm() {
 
       // Success - store user info and redirect
       localStorage.setItem('user', JSON.stringify(data.user));
-      navigate(`/dashboard/${data.user.role}`);
+      if (data.user.role === 'educator') {
+        navigate('/educator/home');
+      } else {
+        navigate('/dashboard/student');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
