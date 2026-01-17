@@ -1,43 +1,34 @@
-import openRouterService from './openRouterService.js';
+import backboardService from './backboardService.js';
 
 class ImageGenerationService {
   constructor() {
-    this.provider = process.env.IMAGE_GEN_PROVIDER || 'openrouter';
+    this.provider = process.env.IMAGE_GEN_PROVIDER || 'openai';
   }
 
   /**
-   * Generate image using OpenRouter (supports image generation models)
-   * Note: DALL-E models don't support temperature parameter
+   * Generate image using Backboard.io (supports image generation models)
    */
-  async generateWithOpenRouter(prompt, model = 'openai/gpt-5-image') {
+  async generateWithBackboard(prompt, llmProvider = 'openai', modelName = 'dall-e-3') {
     try {
-      return await openRouterService.generateImage(prompt, model, {
+      return await backboardService.generateImage(prompt, llmProvider, modelName, {
         timeout: 120000
       });
     } catch (error) {
-      console.error('OpenRouter image generation error:', error);
+      console.error('Backboard.io image generation error:', error);
       throw error;
     }
   }
 
   /**
-   * Generate image for a lesson slide using OpenRouter
+   * Generate image for a lesson slide using Backboard.io
    */
   async generateSlideImage(slideScript, slideNumber, topic, provider = null, model = null) {
     const prompt = `Educational illustration for slide ${slideNumber} about ${topic}. ${slideScript.substring(0, 200)}. Style: clean, educational, professional, suitable for classroom presentation.`;
     
     try {
       const useProvider = provider || this.provider;
-      // Map model to valid OpenRouter model ID
-      let modelName;
-      if (model) {
-        // Model is already provided, map it to valid OpenRouter ID
-        modelName = openRouterService.mapProviderToModel(useProvider, model);
-      } else {
-        // Default to GPT-5 Image for image generation
-        modelName = 'openai/gpt-5-image';
-      }
-      return await this.generateWithOpenRouter(prompt, modelName);
+      const { llmProvider, modelName } = backboardService.mapProviderToModel(useProvider, model || 'dall-e-3');
+      return await this.generateWithBackboard(prompt, llmProvider, modelName);
     } catch (error) {
       console.error('Slide image generation error:', error);
       throw new Error(`Image generation failed: ${error.message}`);

@@ -12,57 +12,65 @@ class GroupingService {
   getAICombos() {
     return {
       // For Lesson tasks (script + image)
+      // Models are from Backboard.io Model Library: https://backboard.io
+      // For Google image generation, we use gemini-2.5-flash-image
+      // First two combos ensure we have at least one Gemini and one GPT variant
       lesson: [
         {
-          scriptModel: { provider: 'google', model: 'google/gemini-pro', name: 'Google Gemini Pro' },
-          imageModel: { provider: 'google', model: 'google/nano-banana-pro', name: 'Google Nano Banana Pro' }
+          scriptModel: { provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
+          imageModel: { provider: 'google', model: 'google/gemini-2.5-flash-image', name: 'Google Gemini 2.5 Flash Image' }
         },
         {
-          scriptModel: { provider: 'openai', model: 'openai/gpt-3.5-turbo', name: 'OpenAI GPT-3.5 Turbo' },
+          scriptModel: { provider: 'openai', model: 'gpt-4o', name: 'OpenAI GPT-4o' },
           imageModel: { provider: 'openai', model: 'openai/gpt-5-image-mini', name: 'OpenAI GPT-5 Image Mini' }
         },
         {
-          scriptModel: { provider: 'openai', model: 'openai/gpt-4', name: 'OpenAI GPT-4' },
+          scriptModel: { provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
+          imageModel: { provider: 'google', model: 'google/gemini-2.5-flash-image', name: 'Google Gemini 2.5 Flash Image' }
+        },
+        {
+          scriptModel: { provider: 'openai', model: 'gpt-5', name: 'OpenAI GPT-5' },
           imageModel: { provider: 'openai', model: 'openai/gpt-5-image', name: 'OpenAI GPT-5 Image' }
         },
         {
-          scriptModel: { provider: 'anthropic', model: 'anthropic/claude-3-sonnet', name: 'Anthropic Claude 3 Sonnet' },
-          imageModel: { provider: 'minimax', model: 'minimax/minimax-01', name: 'MiniMax MiniMax-01' }
+          scriptModel: { provider: 'openai', model: 'gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
+          imageModel: { provider: 'openai', model: 'openai/gpt-5-image', name: 'OpenAI GPT-5 Image' }
         },
         {
-          scriptModel: { provider: 'anthropic', model: 'anthropic/claude-3-opus', name: 'Anthropic Claude 3 Opus' },
-          imageModel: { provider: 'minimax', model: 'minimax/minimax-m2.1', name: 'MiniMax M2.1' }
-        },
-        {
-          scriptModel: { provider: 'openrouter', model: 'mistralai/mistral-7b-instruct', name: 'Mistral 7B' },
-          imageModel: { provider: 'prime-intellect', model: 'prime-intellect/intellect-3', name: 'Prime Intellect INTELLECT-3' }
+          scriptModel: { provider: 'anthropic', model: 'claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' },
+          imageModel: { provider: 'openai', model: 'openai/gpt-5-image-mini', name: 'OpenAI GPT-5 Image Mini' }
         }
       ],
       // For Quiz tasks (quiz prompt + quiz questions)
+      // Models are from Backboard.io Model Library: https://backboard.io
       quiz: [
         {
-          quizPromptModel: { provider: 'google', model: 'google/gemini-pro', name: 'Google Gemini Pro' },
-          quizQuestionsModel: { provider: 'google', model: 'google/gemini-pro', name: 'Google Gemini Pro' }
+          quizPromptModel: { provider: 'google', model: 'gemini-2.5-flash-lite', name: 'Google Gemini 2.5 Flash Lite' },
+          quizQuestionsModel: { provider: 'google', model: 'gemini-2.5-flash-lite', name: 'Google Gemini 2.5 Flash Lite' }
         },
         {
-          quizPromptModel: { provider: 'openai', model: 'openai/gpt-3.5-turbo', name: 'OpenAI GPT-3.5 Turbo' },
-          quizQuestionsModel: { provider: 'openai', model: 'openai/gpt-3.5-turbo', name: 'OpenAI GPT-3.5 Turbo' }
+          quizPromptModel: { provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
+          quizQuestionsModel: { provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' }
         },
         {
-          quizPromptModel: { provider: 'openai', model: 'openai/gpt-4', name: 'OpenAI GPT-4' },
-          quizQuestionsModel: { provider: 'openai', model: 'openai/gpt-4', name: 'OpenAI GPT-4' }
+          quizPromptModel: { provider: 'google', model: 'gemini-2.5-pro', name: 'Google Gemini 2.5 Pro' },
+          quizQuestionsModel: { provider: 'google', model: 'gemini-2.5-pro', name: 'Google Gemini 2.5 Pro' }
         },
         {
-          quizPromptModel: { provider: 'anthropic', model: 'anthropic/claude-3-sonnet', name: 'Anthropic Claude 3 Sonnet' },
-          quizQuestionsModel: { provider: 'anthropic', model: 'anthropic/claude-3-sonnet', name: 'Anthropic Claude 3 Sonnet' }
+          quizPromptModel: { provider: 'openai', model: 'gpt-4o', name: 'OpenAI GPT-4o' },
+          quizQuestionsModel: { provider: 'openai', model: 'gpt-4o', name: 'OpenAI GPT-4o' }
         },
         {
-          quizPromptModel: { provider: 'anthropic', model: 'anthropic/claude-3-opus', name: 'Anthropic Claude 3 Opus' },
-          quizQuestionsModel: { provider: 'anthropic', model: 'anthropic/claude-3-opus', name: 'Anthropic Claude 3 Opus' }
+          quizPromptModel: { provider: 'openai', model: 'gpt-5', name: 'OpenAI GPT-5' },
+          quizQuestionsModel: { provider: 'openai', model: 'gpt-5', name: 'OpenAI GPT-5' }
         },
         {
-          quizPromptModel: { provider: 'openrouter', model: 'mistralai/mistral-7b-instruct', name: 'Mistral 7B' },
-          quizQuestionsModel: { provider: 'openrouter', model: 'mistralai/mistral-7b-instruct', name: 'Mistral 7B' }
+          quizPromptModel: { provider: 'openai', model: 'gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
+          quizQuestionsModel: { provider: 'openai', model: 'gpt-5-mini', name: 'OpenAI GPT-5 Mini' }
+        },
+        {
+          quizPromptModel: { provider: 'anthropic', model: 'claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' },
+          quizQuestionsModel: { provider: 'anthropic', model: 'claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' }
         }
       ]
     };

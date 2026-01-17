@@ -26,11 +26,59 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ferdinandsz08_db_user:uDkMwUSdIHBerBQt@learningplatform.4l74fuy.mongodb.net/uottahack?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI;
 
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((error) => console.error('MongoDB connection error:', error));
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is not set!');
+  console.error('   Please set MONGODB_URI in your .env file or environment variables.');
+  console.error('   Example: MONGODB_URI=mongodb://localhost:27017/uottahack');
+  console.error('   Or for MongoDB Atlas: MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database');
+  process.exit(1);
+}
+
+// MongoDB connection options
+const mongooseOptions = {
+  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+  retryWrites: true,
+  w: 'majority'
+};
+
+mongoose.connect(MONGODB_URI, mongooseOptions)
+  .then(() => {
+    console.log('✅ Connected to MongoDB');
+    console.log(`   Database: ${mongoose.connection.name}`);
+  })
+  .catch((error) => {
+    console.error('❌ MongoDB connection error:', error.message);
+    
+    // Provide helpful error messages based on error type
+    if (error.code === 8000 || error.codeName === 'AtlasError') {
+      console.error('\n🔐 Authentication Error:');
+      console.error('   - Check your MongoDB username and password');
+      console.error('   - Verify your MongoDB Atlas user has proper permissions');
+      console.error('   - Ensure your IP address is whitelisted in MongoDB Atlas');
+      console.error('   - Check if your password contains special characters that need URL encoding');
+    } else if (error.message.includes('ECONNREFUSED')) {
+      console.error('\n🔌 Connection Refused:');
+      console.error('   - Check if MongoDB is running');
+      console.error('   - Verify the connection string host and port');
+      console.error('   - For local MongoDB: mongodb://localhost:27017/uottahack');
+    } else if (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo')) {
+      console.error('\n🌐 DNS/Network Error:');
+      console.error('   - Check your internet connection');
+      console.error('   - Verify the MongoDB hostname is correct');
+      console.error('   - For MongoDB Atlas, check if the cluster is accessible');
+    }
+    
+    console.error('\n💡 To fix:');
+    console.error('   1. Create a .env file in the project root');
+    console.error('   2. Add: MONGODB_URI=your_connection_string_here');
+    console.error('   3. Restart the server');
+    
+    // Don't exit the process - let the server start but operations will fail
+    // This allows the server to start even if MongoDB isn't available
+  });
 
 // Initialize AI Router Service (SAM)
 aiRouterService.initialize().catch(err => {
