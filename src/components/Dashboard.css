@@ -1,13 +1,13 @@
 .dashboard {
   width: 100%;
-  height: 100vh;
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 2rem;
   box-sizing: border-box;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
 }
 
 .dashboard-content {
@@ -82,6 +82,184 @@
   color: #667eea !important;
 }
 
+/* Student Dashboard Sections */
+.dashboard-section {
+  margin-bottom: 3rem;
+}
+
+.dashboard-section h2 {
+  color: #333;
+  font-size: 1.8rem;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.empty-state p {
+  margin: 0.5rem 0;
+}
+
+.empty-state-hint {
+  font-size: 0.9rem;
+  color: #999;
+  font-style: italic;
+}
+
+/* Classes List */
+.classes-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.class-card {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.class-card:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.class-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.class-card-header h3 {
+  color: #333;
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.class-code-badge {
+  background: #667eea;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.class-card-info {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.class-card-info p {
+  margin: 0.3rem 0;
+}
+
+.class-educator {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+/* Tasks List */
+.tasks-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.task-card {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.task-card:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.task-card-header h3 {
+  color: #333;
+  font-size: 1.2rem;
+  margin: 0;
+  flex: 1;
+}
+
+.task-status {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.task-status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.task-status-generating {
+  background: #cfe2ff;
+  color: #084298;
+}
+
+.task-status-completed {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+.task-status-failed {
+  background: #f8d7da;
+  color: #842029;
+}
+
+.task-card-info {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.task-card-info p {
+  margin: 0.3rem 0;
+}
+
+.task-type {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.task-class {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.task-group {
+  font-size: 0.8rem;
+  color: #bbb;
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
   .dashboard-content {
     padding: 2rem 1.5rem;
@@ -89,6 +267,11 @@
   
   .dashboard-header h1 {
     font-size: 2rem;
+  }
+
+  .classes-list,
+  .tasks-list {
+    grid-template-columns: 1fr;
   }
 }
 

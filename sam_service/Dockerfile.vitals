@@ -1,0 +1,137 @@
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    curl \
+    gpg \
+    build-essential \
+    g++ \
+    git \
+    lsb-release \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    pkg-config \
+    libv4l-dev \
+    libgles2-mesa-dev \
+    libunwind-dev \
+    libopencv-dev \
+    libgoogle-glog-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install CMake 3.27.0
+RUN curl -L -o cmake.sh https://github.com/Kitware/CMake/releases/download/v3.27.0/cmake-3.27.0-linux-x86_64.sh && \
+    chmod +x cmake.sh && \
+    ./cmake.sh --skip-license --prefix=/usr/local && \
+    rm cmake.sh
+
+# Install Ninja, ffmpeg (for video conversion), and additional build tools
+RUN apt-get update && \
+    apt-get install -y ninja-build ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add Presage repository (for potential future use)
+RUN curl -s "https://presage-security.github.io/PPA/KEY.gpg" | gpg --dearmor | tee /etc/apt/trusted.gpg.d/presage-technologies.gpg >/dev/null && \
+    curl -s --compressed -o /etc/apt/sources.list.d/presage-technologies.list "https://presage-security.github.io/PPA/presage-technologies.list" || true
+
+# Note: libsmartspectra-dev requires libphysiologyedge-dev which needs partner access
+# So we'll build SmartSpectra SDK from the cloned source instead
+# The source repository is public and can be built without Physiology Edge dependency
+
+# Verify SDK installation
+RUN ldconfig && \
+    (ldconfig -p | grep smartspectra || echo "⚠️  SDK libraries may need manual verification")
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install Python dependencies from requirements.txt (includes custom metrics dependencies)
+RUN pip3 install --no-cache-dir -r requirements.txt \
+    || (echo "⚠️  Some packages failed, trying essential packages..." && \
+        pip3 install --no-cache-dir \
+        flask>=2.3.0 \
+        flask-cors>=4.0.0 \
+        python-dotenv>=1.0.0 \
+        requests>=2.31.0 \
+        opencv-python>=4.8.0 \
+        numpy>=1.24.0 \
+        mediapipe==0.9.3.0 \
+        scipy>=1.10.0)
+
+# Copy SmartSpectra source (mounted via docker-compose)
+# The source will be available at /tmp/SmartSpectra from the volume mount
+# We'll build it in the RUN step below
+
+# Copy SmartSpectra source into image (if available in build context)
+# This allows building the SDK at image build time
+# Note: COPY will fail if SmartSpectra doesn't exist, so we handle it gracefully
+COPY SmartSpectra /tmp/SmartSpectra
+
+# Try to build SDK from source at build time
+# Use SMART_SPECTRA_LOCAL_BUILD to skip Physiology Edge requirement
+RUN if [ -d "/tmp/SmartSpectra/cpp" ]; then \
+        echo "🔨 Building SmartSpectra SDK from source..."; \
+        cd /tmp/SmartSpectra/cpp && \
+        mkdir -p build && \
+        cd build && \
+        (cmake -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SAMPLES=OFF \
+            -DSMART_SPECTRA_LOCAL_BUILD=ON \
+            .. && \
+         ninja && \
+         ninja install && \
+         ldconfig && \
+         echo "✅ SDK built and installed") || \
+        (echo "⚠️  SDK build failed - may need Physiology Edge library" && \
+         echo "   Service will use fallback mode"); \
+    else \
+        echo "⚠️  SmartSpectra source not found - service will use fallback mode"; \
+    fi
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Copy vitals service, custom metrics modules, and wrapper
+COPY vitals_service.py .
+COPY heart_rate_monitor.py .
+COPY eye_tracker.py .
+COPY custom_metrics_processor.py .
+COPY presage_wrapper.cpp build_wrapper.sh CMakeLists.txt ./
+
+# Build the C++ wrapper (try CMake first, fallback to shell script)
+RUN chmod +x build_wrapper.sh && \
+    (mkdir -p build_wrapper && \
+     cd build_wrapper && \
+     (cmake .. -DCMAKE_BUILD_TYPE=Release && \
+      cmake --build . --config Release && \
+      cp presage_wrapper ..) || \
+     (cd .. && ./build_wrapper.sh)) || \
+    echo "⚠️  Wrapper build failed - service will use fallback mode"
+
+# Set library path for runtime
+ENV LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
+
+# Expose port
+EXPOSE 5002
+
+# Environment variables (can be overridden)
+ENV VITALS_SERVICE_PORT=5002
+ENV PRESAGE_API_KEY=""
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5002/health || exit 1
+
+# Run the service via entrypoint (which builds SDK if needed)
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+

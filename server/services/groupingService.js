@@ -1,5 +1,7 @@
 import Enrollment from '../models/Enrollment.js';
 import StudentGroup from '../models/StudentGroup.js';
+import Class from '../models/Class.js';
+import modelRecommendationService from './modelRecommendationService.js';
 
 /**
  * Service for grouping students and assigning AI model combinations
@@ -111,9 +113,16 @@ class GroupingService {
 
   /**
    * Create student groups for a task and assign AI combos
+   * Uses model recommendations to assign best models per student
    */
   async createGroupsForTask(taskId, classId, taskType) {
     try {
+      // Get class info for grade level and subject
+      const classData = await Class.findById(classId);
+      if (!classData) {
+        throw new Error('Class not found');
+      }
+
       // Get all enrolled students in the class
       const enrollments = await Enrollment.find({ class: classId })
         .populate('student', 'username');
@@ -131,7 +140,7 @@ class GroupingService {
         return { groups: [], message: 'No students to group' };
       }
 
-      // Get available AI combos for this task type
+      // Get available AI combos for this task type (fallback)
       const combos = this.getAICombos()[taskType.toLowerCase()];
       if (!combos || combos.length === 0) {
         throw new Error(`No AI combos available for task type: ${taskType}`);
@@ -142,8 +151,101 @@ class GroupingService {
       
       for (let i = 0; i < studentGroups.length; i++) {
         const group = studentGroups[i];
-        // Cycle through available combos (if more groups than combos, reuse)
-        const combo = combos[i % combos.length];
+        
+        // Try to get recommended models for students in this group
+        let combo = null;
+        
+        // Get recommendations for each student and find the most common best model
+        const recommendations = await Promise.all(
+          group.map(async (studentId) => {
+            try {
+              const rec = await modelRecommendationService.getBestModelForStudent(
+                studentId,
+                taskType,
+                classData.gradeLevel,
+                classData.subject
+              );
+              return rec;
+            } catch (error) {
+              console.error(`Error getting recommendation for student ${studentId}:`, error);
+              return null;
+            }
+          })
+        );
+
+        // Count model occurrences
+        const modelCounts = {};
+        recommendations.forEach(rec => {
+          if (rec && rec.model) {
+            const key = `${rec.provider}/${rec.model}`;
+            modelCounts[key] = (modelCounts[key] || 0) + 1;
+          }
+        });
+
+        // Find the most recommended model for this group
+        let bestModelKey = null;
+        let maxCount = 0;
+        for (const [key, count] of Object.entries(modelCounts)) {
+          if (count > maxCount) {
+            maxCount = count;
+            bestModelKey = key;
+          }
+        }
+
+        // If we have a recommendation, try to match it to a combo
+        if (bestModelKey && maxCount > 0) {
+          const [provider, model] = bestModelKey.split('/');
+          const recommendedCombo = combos.find(c => {
+            if (taskType === 'Lesson') {
+              return c.scriptModel?.provider === provider && 
+                     (c.scriptModel?.model === model || c.scriptModel?.model?.includes(model));
+            } else {
+              return c.quizQuestionsModel?.provider === provider && 
+                     (c.quizQuestionsModel?.model === model || c.quizQuestionsModel?.model?.includes(model));
+            }
+          });
+
+          if (recommendedCombo) {
+            combo = recommendedCombo;
+            console.log(`[Grouping] Using recommended model for group ${i + 1}: ${bestModelKey} (${maxCount}/${group.length} students)`);
+          }
+        }
+
+        // Fallback to cycling through combos if no recommendation found
+        if (!combo) {
+          // Try global recommendation
+          try {
+            const globalRec = await modelRecommendationService.getBestModelGlobal(
+              taskType,
+              classData.gradeLevel,
+              classData.subject
+            );
+            
+            if (globalRec) {
+              const [provider, model] = globalRec.model.split('/');
+              const globalCombo = combos.find(c => {
+                if (taskType === 'Lesson') {
+                  return c.scriptModel?.provider === provider;
+                } else {
+                  return c.quizQuestionsModel?.provider === provider;
+                }
+              });
+              
+              if (globalCombo) {
+                combo = globalCombo;
+                console.log(`[Grouping] Using global recommended model for group ${i + 1}: ${provider}`);
+              }
+            }
+          } catch (error) {
+            console.error('Error getting global recommendation:', error);
+          }
+        }
+
+        // Final fallback: cycle through available combos
+        if (!combo) {
+          combo = combos[i % combos.length];
+          console.log(`[Grouping] Using fallback combo for group ${i + 1}`);
+        }
 
         const studentGroup = new StudentGroup({
           task: taskId,

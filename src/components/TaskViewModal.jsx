@@ -1,8 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './TaskViewModal.css';
 
 function TaskViewModal({ task, onClose }) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [sessionId, setSessionId] = useState(null);
+  const [isCollectingMetrics, setIsCollectingMetrics] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const [metricsStatus, setMetricsStatus] = useState('idle'); // idle, starting, active, stopping
+  
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const frameIntervalRef = useRef(null);
+  const userRef = useRef(null);
+  const audioRef = useRef(null);
   
   if (!task) return null;
 
@@ -60,6 +71,28 @@ function TaskViewModal({ task, onClose }) {
     }
   };
 
+  // Pause and reset audio when slide changes
+  useEffect(() => {
+    if (audioRef.current) {
+      // Pause any currently playing audio
+      const audio = audioRef.current;
+      if (audio) {
+        // Pause and reset, handling any play() promises
+        const pausePromise = audio.pause();
+        if (pausePromise !== undefined) {
+          pausePromise.catch(() => {
+            // Ignore pause errors
+          });
+        }
+        audio.currentTime = 0;
+        // Load the new source
+        if (currentSlide?.speechUrl) {
+          audio.load(); // This will reload with the new src
+        }
+      }
+    }
+  }, [currentSlideIndex, currentSlide?.speechUrl]);
+
   const handlePrevious = () => {
     if (currentSlideIndex > 0) {
       setCurrentSlideIndex(currentSlideIndex - 1);
@@ -75,20 +108,254 @@ function TaskViewModal({ task, onClose }) {
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowLeft') handlePrevious();
     if (e.key === 'ArrowRight') handleNext();
-    if (e.key === 'Escape') onClose();
+    if (e.key === 'Escape') {
+      handleClose();
+    }
+  };
+
+  // Get user from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      userRef.current = JSON.parse(userData);
+    }
+  }, []);
+
+  // Start metrics collection when modal opens
+  useEffect(() => {
+    if (task && userRef.current && userRef.current.role === 'student') {
+      startMetricsCollection();
+    }
+
+    return () => {
+      // Cleanup on unmount
+      stopMetricsCollection();
+    };
+  }, [task]);
+
+  const startMetricsCollection = async () => {
+    if (!userRef.current || userRef.current.role !== 'student') {
+      return; // Only collect metrics for students
+    }
+
+    try {
+      setMetricsStatus('starting');
+      setCameraError(null);
+
+      // Request camera access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }
+      });
+
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        const playPromise = videoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            // Ignore interruption errors
+            if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
+              console.warn('[Video] Play error:', error);
+            }
+          });
+        }
+      }
+
+      // Start session with backend
+      const response = await fetch('/api/metrics/session/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId: userRef.current.id,
+          taskId: task.id || task._id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start metrics session');
+      }
+
+      setSessionId(data.sessionId);
+      setIsCollectingMetrics(true);
+      setMetricsStatus('active');
+
+      // Start capturing frames (every 1 second = 1 FPS for vitals)
+      frameIntervalRef.current = setInterval(() => {
+        captureAndSendFrame(data.sessionId);
+      }, 1000); // 1 FPS is sufficient for vitals
+
+    } catch (error) {
+      console.error('[TaskViewModal] Error starting metrics collection:', error);
+      setCameraError(error.message);
+      setMetricsStatus('idle');
+      
+      // Stop stream if it was started
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    }
+  };
+
+  const captureAndSendFrame = async (sessionIdToUse) => {
+    if (!videoRef.current || !canvasRef.current || !sessionIdToUse) {
+      return;
+    }
+
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+
+      // Reduce canvas size for smaller payload (vitals don't need full resolution)
+      // Use 640x480 max, which is sufficient for vitals detection
+      const maxWidth = 640;
+      const maxHeight = 480;
+      const videoWidth = video.videoWidth || 1280;
+      const videoHeight = video.videoHeight || 720;
+      
+      // Calculate scaled dimensions maintaining aspect ratio
+      let canvasWidth = videoWidth;
+      let canvasHeight = videoHeight;
+      
+      if (videoWidth > maxWidth || videoHeight > maxHeight) {
+        const scale = Math.min(maxWidth / videoWidth, maxHeight / videoHeight);
+        canvasWidth = Math.floor(videoWidth * scale);
+        canvasHeight = Math.floor(videoHeight * scale);
+      }
+
+      // Set canvas size to scaled dimensions
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+
+      // Draw current video frame to canvas (scaled)
+      ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+
+      // Convert canvas to base64 with lower quality for smaller payload
+      // Quality 0.5 should keep file size under 50KB for 640x480
+      const frameData = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+
+      // Send frame to backend
+      const response = await fetch('/api/metrics/frame', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: sessionIdToUse,
+          frameData: frameData,
+          timestamp: Date.now()
+        }),
+      });
+
+      // Log metrics in real-time for testing
+      if (response.ok) {
+        const data = await response.json();
+        if (data.metrics) {
+          const m = data.metrics;
+          const hr = m.heart_rate !== null && m.heart_rate !== undefined ? m.heart_rate : (m.heartRate !== null && m.heartRate !== undefined ? m.heartRate : null);
+          const br = m.breathing_rate !== null && m.breathing_rate !== undefined ? m.breathing_rate : (m.breathingRate !== null && m.breathingRate !== undefined ? m.breathingRate : null);
+          const focus = m.focus_score !== null && m.focus_score !== undefined ? m.focus_score : (m.focusScore !== null && m.focusScore !== undefined ? m.focusScore : 0);
+          const engagement = m.engagement_score !== null && m.engagement_score !== undefined ? m.engagement_score : (m.engagementScore !== null && m.engagementScore !== undefined ? m.engagementScore : 0);
+          const thinking = m.thinking_intensity !== null && m.thinking_intensity !== undefined ? m.thinking_intensity : (m.thinkingIntensity !== null && m.thinkingIntensity !== undefined ? m.thinkingIntensity : 0);
+          
+          console.log('📊 [METRICS]', {
+            heartRate: hr !== null ? `${hr.toFixed(1)} BPM` : 'N/A',
+            breathingRate: br !== null ? `${br.toFixed(1)} BPM` : 'N/A',
+            focus: `${focus.toFixed(1)}/100`,
+            engagement: `${engagement.toFixed(1)}/100`,
+            thinking: `${thinking.toFixed(1)}/100`,
+            timestamp: new Date().toLocaleTimeString()
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[TaskViewModal] Error sending frame:', error);
+      // Don't stop collection on individual frame errors
+    }
+  };
+
+  const stopMetricsCollection = async () => {
+    if (frameIntervalRef.current) {
+      clearInterval(frameIntervalRef.current);
+      frameIntervalRef.current = null;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    if (sessionId && metricsStatus === 'active') {
+      try {
+        setMetricsStatus('stopping');
+        await fetch('/api/metrics/session/stop', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sessionId: sessionId
+          }),
+        });
+        setMetricsStatus('idle');
+      } catch (error) {
+        console.error('[TaskViewModal] Error stopping metrics collection:', error);
+      }
+    }
+
+    setIsCollectingMetrics(false);
+    setSessionId(null);
+  };
+
+  const handleClose = () => {
+    stopMetricsCollection();
+    onClose();
   };
 
   return (
     <div 
       className="task-view-overlay" 
-      onClick={onClose}
+      onClick={handleClose}
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       <div className="task-view-content" onClick={(e) => e.stopPropagation()}>
+        {/* Hidden video element for camera capture */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ display: 'none' }}
+        />
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
+
         <div className="task-view-header">
           <div className="task-view-title-section">
             <h2>{task.topic}</h2>
+            {/* Metrics collection status */}
+            {userRef.current?.role === 'student' && (
+              <div className="metrics-status" style={{ 
+                fontSize: '12px', 
+                color: metricsStatus === 'active' ? '#28a745' : '#666',
+                marginTop: '4px'
+              }}>
+                {metricsStatus === 'starting' && 'Starting metrics collection...'}
+                {metricsStatus === 'active' && '📊 Collecting metrics'}
+                {metricsStatus === 'stopping' && 'Stopping metrics collection...'}
+                {cameraError && `⚠️ ${cameraError}`}
+              </div>
+            )}
             {hasVariants && (
               <div className="variant-selector">
                 <label htmlFor="variant-select">Variant:</label>
@@ -110,7 +377,7 @@ function TaskViewModal({ task, onClose }) {
               </div>
             )}
           </div>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <button className="close-btn" onClick={handleClose}>×</button>
         </div>
 
         {/* Show AI models info */}
@@ -174,6 +441,7 @@ function TaskViewModal({ task, onClose }) {
                       <div className="slide-speech">
                         <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: '600', color: '#333' }}>Audio</h3>
                         <audio 
+                          ref={audioRef}
                           controls 
                           src={currentSlide.speechUrl}
                           crossOrigin="anonymous"
@@ -202,6 +470,18 @@ function TaskViewModal({ task, onClose }) {
                           }}
                           onLoadedMetadata={(e) => {
                             console.log('[Audio] Metadata loaded, duration:', e.target.duration);
+                          }}
+                          onPlay={(e) => {
+                            // Handle play() promise to avoid interruption warnings
+                            const playPromise = e.target.play();
+                            if (playPromise !== undefined) {
+                              playPromise.catch(error => {
+                                // Ignore interruption errors (DOMException: The play() request was interrupted)
+                                if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
+                                  console.warn('[Audio] Play error:', error);
+                                }
+                              });
+                            }
                           }}
                         >
                           Your browser does not support the audio element.

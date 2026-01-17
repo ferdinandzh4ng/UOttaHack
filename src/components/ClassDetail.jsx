@@ -7,7 +7,6 @@ import TaskViewModal from './TaskViewModal';
 import './ClassDetail.css';
 
 function ClassDetail() {
-  console.log('[ClassDetail] Component rendering...');
   const { classId } = useParams();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -24,26 +23,14 @@ function ClassDetail() {
   // Define fetchTasks before useEffect that uses it
   const fetchTasks = async () => {
     try {
-      console.log(`[Tasks] Fetching tasks for class ${classId}...`);
       const response = await fetch(`/api/tasks/class/${classId}`);
-      console.log(`[Tasks] Response status:`, response.status);
       const data = await response.json();
-      console.log(`[Tasks] Response data:`, data);
       if (response.ok) {
         const tasksList = data.tasks || [];
-        console.log(`[Tasks] Fetched ${tasksList.length} task(s):`, tasksList);
         tasksList.forEach((task, index) => {
           const status = task.type === 'Lesson' 
             ? task.lessonData?.status 
             : task.quizData?.status;
-          console.log(`[Tasks] Task ${index + 1}:`, {
-            id: task.id,
-            topic: task.topic,
-            type: task.type,
-            status: status,
-            hasSlides: task.type === 'Lesson' ? (task.lessonData?.slides?.length || 0) : 0,
-            hasQuestions: task.type === 'Quiz' ? (task.quizData?.questions?.length || 0) : 0
-          });
         });
         setTasks(tasksList);
       } else {
@@ -55,15 +42,12 @@ function ClassDetail() {
   };
 
   useEffect(() => {
-    console.log('[ClassDetail] Component mounted/updated, classId:', classId);
     const userData = localStorage.getItem('user');
     if (!userData) {
-      console.log('[ClassDetail] No user data found, redirecting to home');
       navigate('/');
       return;
     }
     const userObj = JSON.parse(userData);
-    console.log('[ClassDetail] User role:', userObj.role);
     setUser(userObj);
     
     // Fetch class data
@@ -71,11 +55,9 @@ function ClassDetail() {
     
     // Fetch students if educator, check enrollment if student
     if (userObj.role === 'educator') {
-      console.log('[ClassDetail] Educator - fetching students and tasks');
       fetchStudents();
       fetchTasks();
     } else if (userObj.role === 'student') {
-      console.log('[ClassDetail] Student - checking enrollment and fetching tasks');
       checkEnrollment(userObj.id);
       fetchTasks();
     }
@@ -130,7 +112,6 @@ function ClassDetail() {
 
   // Poll for task updates if there are tasks that are pending or generating
   useEffect(() => {
-    console.log('[ClassDetail] Polling effect triggered, tasks count:', tasks.length);
     // Check if there are active tasks
     const hasActiveTasks = tasks.some(task => {
       if (task.type === 'Lesson') {
@@ -141,22 +122,17 @@ function ClassDetail() {
       return false;
     });
 
-    console.log('[ClassDetail] Has active tasks:', hasActiveTasks);
 
     if (!hasActiveTasks && tasks.length === 0) {
-      console.log('[ClassDetail] No active tasks and no tasks at all, skipping polling');
       return; // No tasks at all, no need to poll
     }
 
-    console.log('[ClassDetail] Starting polling interval (every 3 seconds)');
     // Poll every 3 seconds for task updates
     const pollInterval = setInterval(() => {
-      console.log('[ClassDetail] Polling interval triggered, fetching tasks...');
       fetchTasks();
     }, 3000);
 
     return () => {
-      console.log('[ClassDetail] Cleaning up polling interval');
       clearInterval(pollInterval);
     };
   }, [tasks, classId]); // Re-check when tasks change

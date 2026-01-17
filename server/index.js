@@ -8,6 +8,7 @@ import userRoutes from './routes/userRoutes.js';
 import classRoutes from './routes/classRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
 import videoRoutes from './routes/videoRoutes.js';
+import metricRoutes from './routes/metricRoutes.js';
 import aiRouterService from './services/aiRouterService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,7 +21,9 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Increase body parser limit for video frames (10MB should be enough even for larger frames)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -90,6 +93,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/video', videoRoutes);
+app.use('/api/metrics', metricRoutes);
 
 // API endpoint to get routing configuration
 app.get('/api/ai-router/config', async (req, res) => {

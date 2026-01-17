@@ -467,11 +467,29 @@ async function generateQuiz(taskId, topic, questionType, numQuestions, promptMod
     // Parse and format questions
     console.log('[Generate Quiz] Questions result:', JSON.stringify(questionsData, null, 2));
     
+    // Helper function to get valid question type
+    const getValidQuestionType = (questionType, fallbackType) => {
+      // If question has its own type, use it if valid, otherwise use fallback
+      if (questionType && ['MCQ', 'True/False', 'Short Answer'].includes(questionType)) {
+        return questionType;
+      }
+      // If fallback is 'Mixed', default to 'MCQ' since 'Mixed' is not valid for individual questions
+      if (fallbackType === 'Mixed') {
+        return 'MCQ';
+      }
+      // Otherwise use fallback if it's valid
+      if (fallbackType && ['MCQ', 'True/False', 'Short Answer'].includes(fallbackType)) {
+        return fallbackType;
+      }
+      // Final fallback
+      return 'MCQ';
+    };
+
     if (questionsData.questions && Array.isArray(questionsData.questions)) {
       task.quizData.questions = questionsData.questions.map((q, index) => ({
         questionNumber: index + 1,
         question: q.question || '',
-        type: q.type || questionType,
+        type: getValidQuestionType(q.type, questionType),
         options: q.options || [],
         correctAnswer: q.correctAnswer || '',
         explanation: q.explanation || ''
@@ -482,7 +500,7 @@ async function generateQuiz(taskId, topic, questionType, numQuestions, promptMod
       task.quizData.questions = questionsData.map((q, index) => ({
         questionNumber: index + 1,
         question: q.question || '',
-        type: q.type || questionType,
+        type: getValidQuestionType(q.type, questionType),
         options: q.options || [],
         correctAnswer: q.correctAnswer || '',
         explanation: q.explanation || ''
@@ -791,6 +809,109 @@ router.get('/:taskId/student/:studentId', async (req, res) => {
   } catch (error) {
     console.error('Get student task error:', error);
     res.status(500).json({ error: 'Server error fetching student task' });
+  }
+});
+
+// Get all tasks for a student (across all their enrolled classes)
+router.get('/student/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // Import required models
+    const Enrollment = (await import('../models/Enrollment.js')).default;
+    const StudentGroup = (await import('../models/StudentGroup.js')).default;
+
+    // Get all classes the student is enrolled in
+    const enrollments = await Enrollment.find({ student: studentId })
+      .populate('class', 'gradeLevel subject classCode');
+    
+    if (enrollments.length === 0) {
+      return res.json({ tasks: [] });
+    }
+
+    const classIds = enrollments.map(e => e.class._id);
+
+    // Get all parent tasks for these classes
+    const parentTasks = await Task.find({
+      class: { $in: classIds },
+      parentTask: null // Only get parent tasks, not variants
+    }).sort({ createdAt: -1 });
+
+    // For each parent task, find the student's group and their assigned variant
+    const tasksWithVariants = await Promise.all(
+      parentTasks.map(async (parentTask) => {
+        // Find the group this student belongs to for this task
+        const group = await StudentGroup.findOne({
+          task: parentTask._id,
+          students: studentId
+        });
+
+        // Find the enrollment for this class
+        const enrollment = enrollments.find(e => {
+          const classId = e.class._id ? e.class._id.toString() : e.class.toString();
+          return classId === parentTask.class.toString();
+        });
+        const classInfo = enrollment?.class || null;
+
+        if (!group) {
+          // Student not in any group yet (shouldn't happen, but handle gracefully)
+          return {
+            id: parentTask._id,
+            type: parentTask.type,
+            topic: parentTask.topic,
+            class: {
+              id: classInfo?._id || parentTask.class,
+              gradeLevel: classInfo?.gradeLevel || 'Unknown',
+              subject: classInfo?.subject || 'Unknown',
+              classCode: classInfo?.classCode || 'N/A'
+            },
+            status: parentTask.type === 'Lesson' 
+              ? (parentTask.lessonData?.status || 'pending')
+              : (parentTask.quizData?.status || 'pending'),
+            variantStatus: 'not_assigned',
+            createdAt: parentTask.createdAt
+          };
+        }
+
+        // Get the task variant assigned to this group
+        const taskVariant = group.taskVariantId 
+          ? await Task.findById(group.taskVariantId)
+          : null;
+
+        const status = parentTask.type === 'Lesson' 
+          ? (parentTask.lessonData?.status || 'pending')
+          : (parentTask.quizData?.status || 'pending');
+
+        const variantStatus = taskVariant
+          ? (parentTask.type === 'Lesson'
+              ? (taskVariant.lessonData?.status || 'pending')
+              : (taskVariant.quizData?.status || 'pending'))
+          : 'generating';
+
+        return {
+          id: taskVariant ? taskVariant._id : parentTask._id,
+          parentTaskId: parentTask._id,
+          type: parentTask.type,
+          topic: parentTask.topic,
+          class: {
+            id: classInfo?._id || parentTask.class,
+            gradeLevel: classInfo?.gradeLevel || 'Unknown',
+            subject: classInfo?.subject || 'Unknown',
+            classCode: classInfo?.classCode || 'N/A'
+          },
+          status: variantStatus,
+          groupNumber: group.groupNumber,
+          lessonData: taskVariant?.lessonData || parentTask.lessonData,
+          quizData: taskVariant?.quizData || parentTask.quizData,
+          createdAt: parentTask.createdAt
+        };
+      })
+    );
+
+    res.json({ tasks: tasksWithVariants });
+  } catch (error) {
+    console.error('Get student tasks error:', error);
+    res.status(500).json({ error: 'Server error fetching student tasks' });
   }
 });
 

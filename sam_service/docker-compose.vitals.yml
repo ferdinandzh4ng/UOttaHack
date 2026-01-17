@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  vitals-service:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.vitals
+    container_name: uottahack-vitals-service
+    ports:
+      - "5002:5002"
+    environment:
+      - VITALS_SERVICE_PORT=5002
+      - PRESAGE_API_KEY=${PRESAGE_API_KEY:-}
+      - LD_LIBRARY_PATH=/usr/local/lib:/usr/lib
+    volumes:
+      # Mount .env file if it exists (optional)
+      - ../.env:/app/.env:ro
+      # Note: SmartSpectra source is copied into image at build time, not mounted
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+

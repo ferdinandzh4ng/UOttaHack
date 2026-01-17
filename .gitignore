@@ -39,3 +39,4 @@ sam_service/.env
 *.njsproj
 *.sln
 *.sw?
+sam_service/SmartSpectra/

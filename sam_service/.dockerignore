@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+*.log
+certs/
+solace_ai_connector.log
+# Don't ignore SmartSpectra - we want to copy it if it exists
+# SmartSpectra/
+sdk_output/
+presage_wrapper
+*.o
+.git/
