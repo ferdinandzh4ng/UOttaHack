@@ -12,15 +12,15 @@ class AIRouterService {
     this.routingConfig = {
       // Script generation routing
       'script.lesson': {
-        providers: ['openrouter', 'openai', 'google', 'anthropic'],
-        default: process.env.SCRIPT_GEN_PROVIDER || 'openrouter',
+        providers: ['openai', 'google', 'anthropic'],
+        default: process.env.SCRIPT_GEN_PROVIDER || 'openai',
         endpoint: '/api/ai/task/script/lesson'
       },
       
       // Image generation routing
       'image.slide': {
-        providers: ['openrouter', 'openai'],
-        default: process.env.IMAGE_GEN_PROVIDER || 'openrouter',
+        providers: ['openai', 'google'],
+        default: process.env.IMAGE_GEN_PROVIDER || 'openai',
         endpoint: '/api/ai/task/image/slide'
       },
       
@@ -33,13 +33,13 @@ class AIRouterService {
       
       // Quiz generation routing
       'quiz.prompt': {
-        providers: ['openrouter', 'openai', 'google', 'anthropic'],
-        default: process.env.QUIZ_GEN_PROVIDER || 'openrouter',
+        providers: ['openai', 'google', 'anthropic'],
+        default: process.env.QUIZ_GEN_PROVIDER || 'openai',
         endpoint: '/api/ai/task/quiz/prompt'
       },
       'quiz.questions': {
-        providers: ['openrouter', 'openai', 'google', 'anthropic'],
-        default: process.env.QUIZ_GEN_PROVIDER || 'openrouter',
+        providers: ['openai', 'google', 'anthropic'],
+        default: process.env.QUIZ_GEN_PROVIDER || 'openai',
         endpoint: '/api/ai/task/quiz/questions'
       }
     };
@@ -125,18 +125,17 @@ class AIRouterService {
 
   /**
    * Fallback to direct service calls when SAM is unavailable
-   * All calls go through OpenRouter
+   * All calls go through Backboard.io
    */
   async fallbackToDirectCall(taskType, params) {
     // Import services dynamically to avoid circular dependencies
-    const openRouterService = (await import('./openRouterService.js')).default;
     const imageGenerationService = (await import('./imageGenerationService.js')).default;
     const elevenLabsService = (await import('./elevenLabsService.js')).default;
     const quizGenerationService = (await import('./quizGenerationService.js')).default;
 
     switch (taskType) {
       case 'script.lesson':
-        return await this.generateLessonScriptWithOpenRouter(
+        return await this.generateLessonScriptWithBackboard(
           params.topic, 
           params.lengthMinutes,
           params.provider,
@@ -175,10 +174,10 @@ class AIRouterService {
   }
 
   /**
-   * Generate lesson script using OpenRouter (fallback when SAM unavailable)
+   * Generate lesson script using Backboard.io (fallback when SAM unavailable)
    */
-  async generateLessonScriptWithOpenRouter(topic, lengthMinutes, provider = 'openrouter', model = null) {
-    const openRouterService = (await import('./openRouterService.js')).default;
+  async generateLessonScriptWithBackboard(topic, lengthMinutes, provider = 'openai', model = null) {
+    const backboardService = (await import('./backboardService.js')).default;
     
     const prompt = `Create an educational lesson script about "${topic}" that is approximately ${lengthMinutes} minutes long when spoken.
 
@@ -206,19 +205,11 @@ Format your response as JSON:
 
     const systemPrompt = 'You are an expert educational content creator. Create engaging, educational lesson scripts that are well-structured and appropriate for classroom use.';
     
-    // Map model to valid OpenRouter model ID
-    let modelName;
-    if (model) {
-      // Model is already provided, map it to valid OpenRouter ID
-      modelName = openRouterService.mapProviderToModel(provider, model);
-    } else {
-      // Use provider to get default model
-      modelName = openRouterService.mapProviderToModel(provider);
-    }
+    // Map provider/model to Backboard.io format
+    const { llmProvider, modelName } = backboardService.mapProviderToModel(provider, model);
     
-    return await openRouterService.generateJSON(prompt, systemPrompt, modelName, {
-      temperature: 0.7,
-      max_tokens: 3000
+    return await backboardService.generateJSON(prompt, systemPrompt, llmProvider, modelName, {
+      timeout: 120000
     });
   }
 

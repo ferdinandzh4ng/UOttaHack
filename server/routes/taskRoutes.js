@@ -210,16 +210,47 @@ async function generateLesson(taskId, topic, lengthMinutes, scriptModel, imageMo
         topic,
         provider: imageModel.provider,
         model: imageModel.model
+      }).catch(error => {
+        console.error(`[Image ${index + 1}] Generation failed:`, error);
+        return null; // Return null on error so we can continue with other slides
       })
     );
     const imageResults = await Promise.all(imagePromises);
     // Extract imageUrl from response objects (SAM bridge returns objects with _metadata)
-    const imageUrls = imageResults.map(result => {
+    // Response can be: string URL, {imageUrl: "url"}, or {success: true, data: "url" or {imageUrl: "url"}}
+    const imageUrls = imageResults.map((result, index) => {
+      if (result === null || result === undefined) {
+        console.warn(`[Image ${index + 1}] Result is null/undefined`);
+        return '';
+      }
+      
+      console.log(`[Image ${index + 1}] Raw result type:`, typeof result);
+      console.log(`[Image ${index + 1}] Raw result:`, JSON.stringify(result).substring(0, 200));
+      
       if (typeof result === 'string') {
+        // Direct URL string
+        console.log(`[Image ${index + 1}] Extracted URL (string):`, result.substring(0, 100));
         return result;
       } else if (result && typeof result === 'object') {
-        return result.imageUrl || result.image_url || '';
+        // Check for nested data structure
+        if (result.data) {
+          // Response wrapped in {success: true, data: ...}
+          const data = result.data;
+          if (typeof data === 'string') {
+            console.log(`[Image ${index + 1}] Extracted URL (data string):`, data.substring(0, 100));
+            return data;
+          } else if (data && typeof data === 'object') {
+            const url = data.imageUrl || data.image_url || '';
+            console.log(`[Image ${index + 1}] Extracted URL (data object):`, url.substring(0, 100));
+            return url;
+          }
+        }
+        // Direct object with imageUrl
+        const url = result.imageUrl || result.image_url || result.url || '';
+        console.log(`[Image ${index + 1}] Extracted URL (direct object):`, url.substring(0, 100));
+        return url;
       }
+      console.warn(`[Image ${index + 1}] Unexpected result type:`, typeof result, result);
       return '';
     });
     
@@ -246,22 +277,46 @@ async function generateLesson(taskId, topic, lengthMinutes, scriptModel, imageMo
     );
     const speechResults = await Promise.all(speechPromises);
     // Extract speechUrl from response objects (SAM bridge returns objects with _metadata)
-    const speechUrls = speechResults.map(result => {
+    // Response can be: string URL, {speechUrl: "url"}, or {success: true, data: "url" or {speechUrl: "url"}}
+    const speechUrls = speechResults.map((result, index) => {
+      console.log(`[Speech ${index + 1}] Raw result:`, typeof result, result);
+      
       if (typeof result === 'string') {
+        // Direct URL string
         return result;
       } else if (result && typeof result === 'object') {
-        return result.speechUrl || result.speech_url || '';
+        // Check for nested data structure
+        if (result.data) {
+          // Response wrapped in {success: true, data: ...}
+          const data = result.data;
+          if (typeof data === 'string') {
+            return data;
+          } else if (data && typeof data === 'object') {
+            return data.speechUrl || data.speech_url || '';
+          }
+        }
+        // Direct object with speechUrl
+        return result.speechUrl || result.speech_url || result.url || '';
       }
+      console.warn(`[Speech ${index + 1}] Unexpected result type:`, result);
       return '';
     });
 
     // Combine slides with images and speech
-    task.lessonData.slides = slides.map((slide, index) => ({
-      slideNumber: slide.slideNumber || index + 1,
-      script: slide.script || '',
-      imageUrl: imageUrls[index] || '',
-      speechUrl: speechUrls[index] || ''
-    }));
+    // Only set URLs if they're non-empty strings (not empty strings or null)
+    task.lessonData.slides = slides.map((slide, index) => {
+      const imageUrl = imageUrls[index];
+      const speechUrl = speechUrls[index];
+      
+      console.log(`[Slide ${index + 1}] Final URLs - imageUrl: ${imageUrl ? imageUrl.substring(0, 50) + '...' : 'EMPTY'}, speechUrl: ${speechUrl ? speechUrl.substring(0, 50) + '...' : 'EMPTY'}`);
+      
+      return {
+        slideNumber: slide.slideNumber || index + 1,
+        script: slide.script || '',
+        imageUrl: (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') ? imageUrl : undefined,
+        speechUrl: (speechUrl && typeof speechUrl === 'string' && speechUrl.trim() !== '') ? speechUrl : undefined
+      };
+    });
 
     task.lessonData.status = 'completed';
     await task.save();
@@ -410,6 +465,8 @@ async function generateQuiz(taskId, topic, questionType, numQuestions, promptMod
     const questionsData = questionsResult;
 
     // Parse and format questions
+    console.log('[Generate Quiz] Questions result:', JSON.stringify(questionsData, null, 2));
+    
     if (questionsData.questions && Array.isArray(questionsData.questions)) {
       task.quizData.questions = questionsData.questions.map((q, index) => ({
         questionNumber: index + 1,
@@ -419,8 +476,21 @@ async function generateQuiz(taskId, topic, questionType, numQuestions, promptMod
         correctAnswer: q.correctAnswer || '',
         explanation: q.explanation || ''
       }));
+      console.log(`[Generate Quiz] Saved ${task.quizData.questions.length} questions to task ${taskId}`);
+    } else if (Array.isArray(questionsData)) {
+      // Handle case where questionsData is directly an array
+      task.quizData.questions = questionsData.map((q, index) => ({
+        questionNumber: index + 1,
+        question: q.question || '',
+        type: q.type || questionType,
+        options: q.options || [],
+        correctAnswer: q.correctAnswer || '',
+        explanation: q.explanation || ''
+      }));
+      console.log(`[Generate Quiz] Saved ${task.quizData.questions.length} questions (from array) to task ${taskId}`);
     } else {
       // Fallback if structure is different
+      console.warn('[Generate Quiz] Unexpected questions data structure:', typeof questionsData, questionsData);
       task.quizData.questions = [];
     }
 
@@ -645,16 +715,27 @@ router.get('/:taskId', async (req, res) => {
         .allowDiskUse(true) // Allow disk-based sorting to prevent memory limit errors
         .lean();
       
-      taskData.variants = variants.map(variant => ({
-        id: variant._id,
-        type: variant.type,
-        topic: variant.topic,
-        lessonData: variant.lessonData,
-        quizData: variant.quizData,
-        aiModels: variant.aiModels,
-        assignedGroup: variant.assignedGroup,
-        createdAt: variant.createdAt
-      }));
+      taskData.variants = variants.map(variant => {
+        // Debug logging for variant data
+        console.log(`[Get Task] Variant ${variant._id}:`, {
+          type: variant.type,
+          hasQuizData: !!variant.quizData,
+          quizStatus: variant.quizData?.status,
+          questionsCount: variant.quizData?.questions?.length || 0,
+          questions: variant.quizData?.questions
+        });
+        
+        return {
+          id: variant._id,
+          type: variant.type,
+          topic: variant.topic,
+          lessonData: variant.lessonData,
+          quizData: variant.quizData, // Make sure quizData is included
+          aiModels: variant.aiModels,
+          assignedGroup: variant.assignedGroup,
+          createdAt: variant.createdAt
+        };
+      });
     }
 
     res.json(taskData);

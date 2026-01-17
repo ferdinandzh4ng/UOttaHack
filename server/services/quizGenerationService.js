@@ -1,22 +1,21 @@
-import openRouterService from './openRouterService.js';
+import backboardService from './backboardService.js';
 
 class QuizGenerationService {
   constructor() {
-    this.provider = process.env.QUIZ_GEN_PROVIDER || 'openrouter';
+    this.provider = process.env.QUIZ_GEN_PROVIDER || 'openai';
   }
 
   /**
-   * Generate quiz prompt using AI LLM via OpenRouter
+   * Generate quiz prompt using AI LLM via Backboard.io
    */
   async generateQuizPrompt(topic, questionType, numQuestions, provider = null, model = null) {
     const prompt = `Create a comprehensive quiz prompt for generating ${numQuestions} ${questionType} questions about ${topic}. The prompt should be detailed enough to generate high-quality educational questions.`;
     
     try {
       const useProvider = provider || this.provider;
-      const modelName = model || openRouterService.mapProviderToModel(useProvider);
-      return await openRouterService.generateText(prompt, null, modelName, {
-        temperature: 0.7,
-        max_tokens: 1000
+      const { llmProvider, modelName } = backboardService.mapProviderToModel(useProvider, model);
+      return await backboardService.generateText(prompt, null, llmProvider, modelName, {
+        timeout: 120000
       });
     } catch (error) {
       console.error('Quiz prompt generation error:', error);
@@ -25,7 +24,7 @@ class QuizGenerationService {
   }
 
   /**
-   * Generate quiz questions and answers using AI LLM via OpenRouter
+   * Generate quiz questions and answers using AI LLM via Backboard.io
    */
   async generateQuizQuestions(quizPrompt, topic, questionType, numQuestions, provider = null, model = null) {
     const systemPrompt = `You are an expert educational content creator. Generate high-quality quiz questions based on the provided prompt.`;
@@ -58,10 +57,9 @@ Format your response as JSON with this structure:
 
     try {
       const useProvider = provider || this.provider;
-      const modelName = model || openRouterService.mapProviderToModel(useProvider);
-      return await openRouterService.generateJSON(userPrompt, systemPrompt, modelName, {
-        temperature: 0.7,
-        max_tokens: 2000
+      const { llmProvider, modelName } = backboardService.mapProviderToModel(useProvider, model);
+      return await backboardService.generateJSON(userPrompt, systemPrompt, llmProvider, modelName, {
+        timeout: 120000
       });
     } catch (error) {
       console.error('Quiz questions generation error:', error);

@@ -102,7 +102,10 @@ class ElevenLabsService {
             Key: s3Key,
             Body: audioBuffer,
             ContentType: 'audio/mpeg',
-            ACL: 'public-read' // Make files publicly accessible
+            CacheControl: 'public, max-age=31536000', // Cache for 1 year
+            ContentDisposition: 'inline' // Allow inline playback
+            // Note: Public access is controlled by bucket policy, not ACLs
+            // ACLs may be disabled on your bucket, so we rely on bucket policy instead
           }));
           
           // Generate public URL

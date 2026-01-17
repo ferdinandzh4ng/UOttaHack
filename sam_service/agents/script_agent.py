@@ -33,19 +33,21 @@ from .multi_model_agent import MultiModelAgent
 class ScriptAgent(Agent, MultiModelAgent):
     """Agent that generates educational lesson scripts with multiple model support"""
     
-    # Supported models for script generation (all via OpenRouter - uses your $10 credits)
-    # Updated to use valid OpenRouter model IDs
+    # Supported models for script generation (all via Backboard.io)
+    # Models are from Backboard.io Model Library: https://backboard.io
     SUPPORTED_MODELS = [
-        {'provider': 'google', 'model': 'google/gemini-2.5-flash-lite', 'name': 'Google Gemini 2.5 Flash Lite', 'uses_credits': True},
-        {'provider': 'openai', 'model': 'openai/gpt-4', 'name': 'OpenAI GPT-4', 'uses_credits': True},
-        {'provider': 'openai', 'model': 'openai/gpt-3.5-turbo', 'name': 'OpenAI GPT-3.5 Turbo', 'uses_credits': True},
-        {'provider': 'anthropic', 'model': 'anthropic/claude-3-sonnet', 'name': 'Anthropic Claude 3 Sonnet', 'uses_credits': True},
-        {'provider': 'anthropic', 'model': 'anthropic/claude-3-opus', 'name': 'Anthropic Claude 3 Opus', 'uses_credits': True},
-        {'provider': 'openrouter', 'model': 'mistralai/mistral-7b-instruct', 'name': 'Mistral 7B', 'uses_credits': True},
+        {'provider': 'google', 'model': 'gemini-2.5-flash-lite', 'name': 'Google Gemini 2.5 Flash Lite', 'uses_credits': True},
+        {'provider': 'google', 'model': 'gemini-2.5-flash', 'name': 'Google Gemini 2.5 Flash', 'uses_credits': True},
+        {'provider': 'google', 'model': 'gemini-2.5-pro', 'name': 'Google Gemini 2.5 Pro', 'uses_credits': True},
+        {'provider': 'openai', 'model': 'gpt-4o', 'name': 'OpenAI GPT-4o', 'uses_credits': True},
+        {'provider': 'openai', 'model': 'gpt-5', 'name': 'OpenAI GPT-5', 'uses_credits': True},
+        {'provider': 'openai', 'model': 'gpt-5-mini', 'name': 'OpenAI GPT-5 Mini', 'uses_credits': True},
+        {'provider': 'openai', 'model': 'gpt-4.1', 'name': 'OpenAI GPT-4.1', 'uses_credits': True},
+        {'provider': 'anthropic', 'model': 'claude-3-7-sonnet-20250219', 'name': 'Anthropic Claude 3.7 Sonnet', 'uses_credits': True},
     ]
     
     def __init__(self):
-        MultiModelAgent.__init__(self, "script_agent", ['google', 'openai', 'openrouter'])
+        MultiModelAgent.__init__(self, "script_agent", ['google', 'openai', 'anthropic'])
         Agent.__init__(
             self,
             name="script_agent",
@@ -63,7 +65,7 @@ class ScriptAgent(Agent, MultiModelAgent):
             "ai/task/script/lesson/google/*",
             "ai/task/script/lesson/openai/*",
             "ai/task/script/lesson/anthropic/*",
-            "ai/task/script/lesson/openrouter/*",
+            "ai/task/script/lesson/openai/*",
             "ai/task/script/lesson"  # Fallback to general topic
         ]
     
