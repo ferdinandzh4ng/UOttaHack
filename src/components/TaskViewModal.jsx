@@ -21,6 +21,10 @@ function TaskViewModal({ task, onClose }) {
 
   // Debug logging
   console.log('[TaskViewModal] Display task:', displayTask);
+  console.log('[TaskViewModal] Task type:', displayTask.type);
+  console.log('[TaskViewModal] Quiz data:', displayTask.quizData);
+  console.log('[TaskViewModal] Quiz questions:', displayTask.quizData?.questions);
+  console.log('[TaskViewModal] Quiz questions length:', displayTask.quizData?.questions?.length);
   console.log('[TaskViewModal] Slides:', slides);
   console.log('[TaskViewModal] Current slide:', currentSlide);
   console.log('[TaskViewModal] Current slide speechUrl:', currentSlide?.speechUrl);
@@ -133,19 +137,31 @@ function TaskViewModal({ task, onClose }) {
                   </div>
                   
                   <div className="slide-content">
-                    {currentSlide?.imageUrl && (
+                    {currentSlide?.imageUrl && currentSlide.imageUrl.trim() !== '' ? (
                       <div className="slide-image">
                         <img 
                           src={currentSlide.imageUrl} 
                           alt={`Slide ${currentSlide.slideNumber}`}
                           onError={(e) => {
+                            console.error('[Image] Error loading image:', currentSlide.imageUrl, e);
                             e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'block';
+                            if (e.target.nextSibling) {
+                              e.target.nextSibling.style.display = 'block';
+                            }
+                          }}
+                          onLoad={() => {
+                            console.log('[Image] Image loaded successfully:', currentSlide.imageUrl);
                           }}
                         />
                         <div className="image-error" style={{ display: 'none' }}>
                           <p>Image could not be loaded</p>
+                          <p style={{ fontSize: '12px', marginTop: '4px' }}>URL: {currentSlide.imageUrl}</p>
                         </div>
+                      </div>
+                    ) : (
+                      <div className="slide-image" style={{ padding: '12px', background: '#fff3cd', borderRadius: '4px', fontSize: '14px', color: '#856404' }}>
+                        <p>No image available for this slide</p>
+                        <p style={{ fontSize: '12px', marginTop: '4px' }}>imageUrl: {currentSlide?.imageUrl || 'undefined'}</p>
                       </div>
                     )}
                     
@@ -154,30 +170,48 @@ function TaskViewModal({ task, onClose }) {
                       <p>{currentSlide?.script || 'No script available'}</p>
                     </div>
 
-                    {currentSlide?.speechUrl && (
+                    {currentSlide?.speechUrl && currentSlide.speechUrl.trim() !== '' ? (
                       <div className="slide-speech">
+                        <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: '600', color: '#333' }}>Audio</h3>
                         <audio 
                           controls 
                           src={currentSlide.speechUrl}
+                          crossOrigin="anonymous"
+                          preload="metadata"
+                          style={{
+                            width: '100%',
+                            height: '54px',
+                            marginBottom: '8px',
+                            display: 'block'
+                          }}
                           onError={(e) => {
                             console.error('[Audio] Error loading audio:', currentSlide.speechUrl, e);
-                            e.target.style.display = 'none';
+                            console.error('[Audio] Error details:', e.target.error);
+                            // Show error message but keep the audio element visible
+                            const errorMsg = e.target.nextElementSibling;
+                            if (errorMsg) {
+                              errorMsg.style.display = 'block';
+                              errorMsg.textContent = `Error loading audio: ${e.target.error?.message || 'Unknown error'}. URL: ${currentSlide.speechUrl}`;
+                            }
                           }}
                           onLoadStart={() => {
-                            console.log('[Audio] Loading audio:', currentSlide.speechUrl);
+                            console.log('[Audio] Loading audio from:', currentSlide.speechUrl);
                           }}
                           onCanPlay={() => {
                             console.log('[Audio] Audio can play:', currentSlide.speechUrl);
                           }}
+                          onLoadedMetadata={(e) => {
+                            console.log('[Audio] Metadata loaded, duration:', e.target.duration);
+                          }}
                         >
                           Your browser does not support the audio element.
                         </audio>
-                        <p className="audio-url-hint" style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
-                          Audio: {currentSlide.speechUrl}
+                        <div className="audio-error" style={{ display: 'none', padding: '8px', background: '#fee', borderRadius: '4px', fontSize: '12px', color: '#c00', marginTop: '4px' }}></div>
+                        <p className="audio-url-hint">
+                          Direct link: <a href={currentSlide.speechUrl} target="_blank" rel="noopener noreferrer">{currentSlide.speechUrl}</a>
                         </p>
                       </div>
-                    )}
-                    {!currentSlide?.speechUrl && (
+                    ) : (
                       <div className="slide-speech" style={{ padding: '12px', background: '#fff3cd', borderRadius: '4px', fontSize: '14px', color: '#856404' }}>
                         <p>No audio available for this slide</p>
                         <p style={{ fontSize: '12px', marginTop: '4px' }}>speechUrl: {currentSlide?.speechUrl || 'undefined'}</p>

@@ -125,13 +125,15 @@ class SpeechAgent(Agent):
         if self.use_s3 and self.s3_client:
             try:
                 # Upload to S3
+                # Note: Public access is controlled by bucket policy, not ACLs
                 s3_key = f"speech/{filename}"
                 self.s3_client.put_object(
                     Bucket=self.s3_bucket,
                     Key=s3_key,
                     Body=response.content,
                     ContentType='audio/mpeg',
-                    ACL='public-read'  # Make files publicly accessible
+                    CacheControl='public, max-age=31536000',  # Cache for 1 year
+                    ContentDisposition='inline'  # Allow inline playback
                 )
                 
                 # Generate public URL
