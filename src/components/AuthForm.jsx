@@ -58,8 +58,10 @@ function AuthForm() {
         <button className="back-btn" onClick={() => navigate('/role-selection')}>
           ← Back
         </button>
-        <h1>{isLogin ? 'Login' : 'Sign Up'}</h1>
-        <p className="role-badge">As {role.charAt(0).toUpperCase() + role.slice(1)}</p>
+        <div className="auth-form-header">
+          <h1>{isLogin ? 'Login' : 'Sign Up'}</h1>
+          <p className="role-badge">As {role.charAt(0).toUpperCase() + role.slice(1)}</p>
+        </div>
         
         <form onSubmit={handleSubmit} className="form">
           <div className="form-group">

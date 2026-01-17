@@ -1,99 +1,204 @@
 .class-detail {
   width: 100%;
-  height: 100vh;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f3f4f6 0%, #ffffff 50%, #f0f9ff 100%);
   padding: 2rem;
   box-sizing: border-box;
   overflow-y: auto;
+  padding-top: 3rem;
 }
 
 .class-detail-content {
-  max-width: 1200px;
+  max-width: 1300px;
   margin: 0 auto;
-  background: white;
-  border-radius: 20px;
-  padding: 3rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  background: var(--base-white);
+  border-radius: 12px;
+  padding: 2.5rem;
+  box-shadow: var(--shadow-md);
   box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
 }
 
 .class-detail-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
+  position: relative;
+}
+
+.class-detail-header .back-btn {
+  position: absolute;
+  left: 0;
 }
 
 .class-detail-header h1 {
-  color: #333;
-  font-size: 2.5rem;
+  color: var(--primary-violet);
+  font-size: 2.2rem;
   margin: 0;
   flex: 1;
   text-align: center;
+  font-weight: 700;
 }
 
 .back-btn {
-  background: #f5f5f5;
-  color: #333;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 10px;
+  background: var(--base-white);
+  color: var(--secondary-teal);
+  border: 1px solid var(--border-subtle);
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  transition: background 0.3s;
+  transition: all 0.2s ease;
 }
 
 .back-btn:hover {
-  background: #e0e0e0;
+  background: var(--base-gray-50);
+  border-color: var(--secondary-teal);
+  color: var(--teal-dark);
+  transform: translateY(-1px);
 }
 
 .logout-btn {
-  background: #f44336;
+  background: #dc2626;
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 10px;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  transition: background 0.3s;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .logout-btn:hover {
-  background: #d32f2f;
+  background: #b91c1c;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .class-info {
-  background: #f5f5f5;
+  background: var(--base-gray-50);
   border-radius: 10px;
-  padding: 1.5rem;
+  padding: 2rem;
   margin-bottom: 2rem;
+  border: 1px solid var(--border-subtle);
 }
 
 .class-info h2 {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 2.5rem;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  margin: 0 0 0.5rem 0;
+  font-family: 'Inter', 'SF Pro Display', -apple-system, sans-serif;
+  font-size: 2.25rem;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin: 0 0 1rem 0;
+  color: var(--primary-violet);
 }
 
 .class-info p {
-  color: #666;
-  margin: 0;
+  color: var(--text-secondary);
+  margin: 0.5rem 0;
+  font-weight: 400;
 }
 
 .class-code {
-  margin-top: 0.5rem;
-  color: #667eea;
+  margin-top: 1rem;
+  color: var(--secondary-teal);
   font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.class-code:hover {
+  color: var(--teal-dark);
+  text-decoration: underline;
+}
+
+.class-code-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.class-code-modal {
+  background: var(--base-white);
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+  max-width: 600px;
+  width: 90%;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.close-modal-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.close-modal-btn:hover {
+  color: var(--primary-violet);
+}
+
+.class-code-modal-label {
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem 0;
+  font-weight: 500;
+}
+
+.class-code-modal-display {
+  font-size: 5.5rem;
+  font-weight: 700;
+  color: var(--primary-violet);
+  margin: 1rem 0;
+  letter-spacing: 0.2em;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+}
+
+.class-code-modal-hint {
+  display: none;
 }
 
 .class-code strong {
-  font-size: 1.2rem;
-  letter-spacing: 2px;
+  font-size: 1.15rem;
+  letter-spacing: 1px;
+  font-weight: 700;
 }
 
 .join-class-section {
@@ -102,30 +207,32 @@
 }
 
 .join-class-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--primary-violet);
   color: white;
   border: none;
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
+  padding: 0.9rem 2rem;
+  font-size: 1rem;
   font-weight: 600;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.2s ease;
 }
 
 .join-class-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  background: var(--violet-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .enrolled-badge {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: rgba(20, 184, 166, 0.1);
+  color: var(--teal-dark);
   padding: 1rem;
-  border-radius: 10px;
+  border-radius: 8px;
   text-align: center;
   margin-bottom: 2rem;
   font-weight: 600;
+  border: 1px solid var(--teal-light);
 }
 
 /* Content Sections - Side by Side */
@@ -138,10 +245,10 @@
 
 .students-panel,
 .tasks-panel {
-  background: #f9f9f9;
-  border-radius: 12px;
-  padding: 2rem;
-  border: 1px solid #e0e0e0;
+  background: var(--base-white);
+  border-radius: 10px;
+  padding: 1.75rem;
+  border: 1px solid var(--border-subtle);
 }
 
 .panel-header {
@@ -153,32 +260,33 @@
 }
 
 .panel-header h2 {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 1.8rem;
-  font-weight: 700;
+  font-family: 'Inter', 'SF Pro Display', -apple-system, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
   letter-spacing: -0.3px;
   margin: 0;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .add-student-btn,
 .create-task-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--primary-violet);
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.7rem 1.5rem;
   font-size: 0.95rem;
   font-weight: 600;
   border-radius: 8px;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.2s ease;
   white-space: nowrap;
 }
 
 .add-student-btn:hover,
 .create-task-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  background: var(--violet-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .students-list {
@@ -191,7 +299,7 @@
   background: white;
   padding: 1rem;
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-subtle);
   transition: all 0.2s;
   display: flex;
   justify-content: space-between;
@@ -200,8 +308,8 @@
 }
 
 .student-card:hover {
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+  border-color: var(--secondary-teal);
+  box-shadow: var(--shadow-sm);
 }
 
 .student-card .card-content {
@@ -210,18 +318,18 @@
 
 .student-card p {
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 1rem;
-  color: #333;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
 .delete-btn {
-  background: #ff4444;
+  background: #dc2626;
   color: white;
   border: none;
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   border-radius: 6px;
   font-size: 16px;
   cursor: pointer;
@@ -234,8 +342,8 @@
 }
 
 .delete-btn:hover {
-  background: #cc0000;
-  transform: scale(1.1);
+  background: #b91c1c;
+  transform: scale(1.05);
 }
 
 .tasks-list {
@@ -248,13 +356,13 @@
   background: white;
   border-radius: 8px;
   padding: 1rem;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-subtle);
   transition: all 0.2s;
 }
 
 .task-card:hover {
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+  border-color: var(--secondary-teal);
+  box-shadow: var(--shadow-sm);
 }
 
 .task-card-header {
@@ -273,19 +381,19 @@
 }
 
 .task-card-header h3 {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 1.1rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1rem;
   font-weight: 600;
   margin: 0;
-  color: #333;
+  color: var(--text-primary);
   flex: 1;
 }
 
 .task-status {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   padding: 0.35rem 0.75rem;
   border-radius: 6px;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
   text-transform: uppercase;
@@ -293,18 +401,18 @@
 }
 
 .task-status-pending {
-  background: #fff3cd;
-  color: #856404;
+  background: rgba(234, 179, 8, 0.1);
+  color: #b45309;
 }
 
 .task-status-generating {
-  background: #cfe2ff;
-  color: #084298;
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
 }
 
 .task-status-completed {
-  background: #d1e7dd;
-  color: #0f5132;
+  background: rgba(34, 197, 94, 0.1);
+  color: #15803d;
 }
 
 .task-card-info {
@@ -328,52 +436,30 @@
 
 .view-task-btn {
   width: 100%;
-  background: #667eea;
+  background: var(--primary-violet);
   color: white;
   border: none;
-  padding: 0.75rem;
+  padding: 0.7rem;
   border-radius: 6px;
   cursor: pointer;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-weight: 600;
   font-size: 0.95rem;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
 .view-task-btn:hover {
-  background: #5568d3;
-}
-
-.no-content {
-  text-align: center;
-  padding: 2rem;
-  color: #999;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-/* Remove old sections styling */
-.students-section {
-  display: none;
-}
-
-.tasks-section {
-  display: none;
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .content-sections {
-    grid-template-columns: 1fr;
-  }
+  background: var(--violet-dark);
+  box-shadow: var(--shadow-sm);
 }
 
 @media (max-width: 768px) {
   .class-detail-content {
-    padding: 2rem 1.5rem;
+    padding: 1.5rem;
   }
   
   .class-detail-header h1 {
-    font-size: 2rem;
+    font-size: 1.75rem;
   }
 
   .class-detail-header {
@@ -384,6 +470,10 @@
   .back-btn,
   .logout-btn {
     width: 100%;
+  }
+
+  .content-sections {
+    grid-template-columns: 1fr;
   }
 }
 

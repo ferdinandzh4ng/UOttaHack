@@ -18,6 +18,7 @@ function ClassDetail() {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [showJoinClassModal, setShowJoinClassModal] = useState(false);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [showClassCodeModal, setShowClassCodeModal] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -276,12 +277,6 @@ function ClassDetail() {
             ← Back to Classes
           </button>
           <h1>Class Details</h1>
-          <button className="logout-btn" onClick={() => {
-            localStorage.removeItem('user');
-            navigate('/');
-          }}>
-            Logout
-          </button>
         </div>
 
         {classData && (
@@ -289,7 +284,15 @@ function ClassDetail() {
             <h2>{classData.subject}</h2>
             <p>Grade {classData.gradeLevel}</p>
             {classData.classCode && user?.role === 'educator' && (
-              <p className="class-code">Class Code: <strong>{classData.classCode}</strong></p>
+              <p 
+                className="class-code" 
+                onClick={() => setShowClassCodeModal(true)}
+                role="button"
+                tabIndex={0}
+                onKeyPress={(e) => e.key === 'Enter' && setShowClassCodeModal(true)}
+              >
+                Class Code: <strong>{classData.classCode}</strong>
+              </p>
             )}
           </div>
         )}
@@ -305,42 +308,6 @@ function ClassDetail() {
         {user?.role === 'student' && isEnrolled && (
           <div className="enrolled-badge">
             <p>✓ You are enrolled in this class</p>
-          </div>
-        )}
-
-        {user?.role === 'educator' && (
-          <div className="students-section">
-            <div className="students-header">
-              <h2>Students</h2>
-              <button className="add-student-btn" onClick={() => setShowAddStudentModal(true)}>
-                + Add Student
-              </button>
-            </div>
-            {students.length === 0 ? (
-              <div className="no-students">
-                <p>No students enrolled yet.</p>
-              </div>
-            ) : (
-              <div className="students-list">
-                {students.map((student) => (
-                  <div key={student.id} className="student-card">
-                    <div className="card-content">
-                      <p>{student.username}</p>
-                    </div>
-                    <button
-                      className="delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteStudent(student.id);
-                      }}
-                      title="Remove student"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -482,6 +449,23 @@ function ClassDetail() {
           task={selectedTask}
           onClose={handleCloseTaskView}
         />
+      )}
+
+      {showClassCodeModal && classData && (
+        <div className="class-code-modal-overlay" onClick={() => setShowClassCodeModal(false)}>
+          <div className="class-code-modal" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="close-modal-btn" 
+              onClick={() => setShowClassCodeModal(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <p className="class-code-modal-label">Class Code</p>
+            <p className="class-code-modal-display">{classData.classCode}</p>
+            <p className="class-code-modal-hint">Click anywhere to close</p>
+          </div>
+        </div>
       )}
     </div>
   );
