@@ -1,17 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './AuthForm.css';
 
 function AuthForm() {
   const [searchParams] = useSearchParams();
-  const role = searchParams.get('role') || 'student';
+  const role = searchParams.get('role');
+  const mode = searchParams.get('mode') || 'login';
   const navigate = useNavigate();
   
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(mode === 'login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Validate role for signup
+  useEffect(() => {
+    if (!isLogin) {
+      // For signup, require role selection
+      if (!role) {
+        navigate('/role-selection');
+        return;
+      }
+      
+      // Validate role is only educator or student
+      if (role !== 'educator' && role !== 'student') {
+        setError('Invalid role. Please select Educator or Student.');
+        navigate('/role-selection');
+        return;
+      }
+    }
+  }, [isLogin, role, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,6 +39,14 @@ function AuthForm() {
 
     try {
       const endpoint = isLogin ? '/api/users/login' : '/api/users/signup';
+      
+      // For signup, ensure role is educator, student, or developer
+      if (!isLogin) {
+        if (!role || (role !== 'educator' && role !== 'student' && role !== 'developer')) {
+          throw new Error('Please select a valid role (Educator, Student, or Developer)');
+        }
+      }
+      
       const body = isLogin 
         ? { username, password }
         : { username, password, role };
@@ -42,6 +69,8 @@ function AuthForm() {
       localStorage.setItem('user', JSON.stringify(data.user));
       if (data.user.role === 'educator') {
         navigate('/educator/home');
+      } else if (data.user.role === 'developer') {
+        navigate('/analytics');
       } else {
         navigate('/dashboard/student');
       }
@@ -55,12 +84,20 @@ function AuthForm() {
   return (
     <div className="auth-form">
       <div className="auth-form-content">
-        <button className="back-btn" onClick={() => navigate('/role-selection')}>
+        <button className="back-btn" onClick={() => {
+          if (isLogin) {
+            navigate('/');
+          } else {
+            navigate('/role-selection');
+          }
+        }}>
           ← Back
         </button>
         <div className="auth-form-header">
           <h1>{isLogin ? 'Login' : 'Sign Up'}</h1>
-          <p className="role-badge">As {role.charAt(0).toUpperCase() + role.slice(1)}</p>
+          {!isLogin && role && (
+            <p className="role-badge">As {role.charAt(0).toUpperCase() + role.slice(1)}</p>
+          )}
         </div>
         
         <form onSubmit={handleSubmit} className="form">
@@ -102,8 +139,15 @@ function AuthForm() {
             type="button" 
             className="link-btn" 
             onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
+              if (isLogin) {
+                // Switching from login to signup - go to role selection
+                navigate('/role-selection');
+              } else {
+                // Switching from signup to login - go to login page
+                setIsLogin(true);
+                setError('');
+                navigate('/auth?mode=login');
+              }
             }}
           >
             {isLogin ? 'Sign Up' : 'Login'}

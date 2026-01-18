@@ -9,10 +9,10 @@
 }
 
 .class-detail-content {
-  max-width: 1300px;
+  max-width: 1400px;
   margin: 0 auto;
   background: var(--base-white);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 2.5rem;
   box-shadow: var(--shadow-md);
   box-sizing: border-box;
@@ -93,7 +93,7 @@
   font-weight: 600;
   letter-spacing: -0.3px;
   margin: 0 0 1rem 0;
-  color: var(--primary-violet);
+  color: #1a1a2e;
 }
 
 .class-info p {
@@ -243,12 +243,22 @@
   margin-top: 2rem;
 }
 
-.students-panel,
-.tasks-panel {
+.students-panel {
   background: var(--base-white);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 1.75rem;
   border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.tasks-panel {
+  background: var(--base-white);
+  border-radius: 12px;
+  padding: 1.75rem;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
 .panel-header {
@@ -265,12 +275,12 @@
   font-weight: 600;
   letter-spacing: -0.3px;
   margin: 0;
-  color: var(--text-primary);
+  color: #1a1a2e;
 }
 
 .add-student-btn,
 .create-task-btn {
-  background: var(--primary-violet);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: white;
   border: none;
   padding: 0.7rem 1.5rem;
@@ -280,13 +290,14 @@
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
 .add-student-btn:hover,
 .create-task-btn:hover {
-  background: var(--violet-dark);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+  transform: translateY(-2px);
 }
 
 .students-list {
@@ -296,9 +307,9 @@
 }
 
 .student-card {
-  background: white;
+  background: var(--base-gray-50);
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--border-subtle);
   transition: all 0.2s;
   display: flex;
@@ -309,7 +320,8 @@
 
 .student-card:hover {
   border-color: var(--secondary-teal);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .student-card .card-content {
@@ -324,14 +336,17 @@
   font-weight: 500;
 }
 
-.delete-btn {
-  background: none;
-  color: var(--text-secondary);
-  border: none;
+.kick-btn,
+.delete-task-btn {
+  background: rgba(0, 0, 0, 0.05);
+  color: #666;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -339,13 +354,16 @@
   transition: all 0.2s ease;
   padding: 0;
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
-.delete-btn:hover {
-  background: var(--base-gray-50);
-  color: var(--text-primary);
+.kick-btn:hover,
+.delete-task-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.2);
+  color: #333;
   opacity: 1;
+  transform: scale(1.1);
 }
 
 .tasks-list {
@@ -355,8 +373,8 @@
 }
 
 .task-card {
-  background: white;
-  border-radius: 8px;
+  background: var(--base-gray-50);
+  border-radius: 10px;
   padding: 1rem;
   border: 1px solid var(--border-subtle);
   transition: all 0.2s;
@@ -364,7 +382,8 @@
 
 .task-card:hover {
   border-color: var(--secondary-teal);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .task-card-header {
@@ -443,21 +462,61 @@
 
 .view-task-btn {
   width: 100%;
-  background: var(--primary-violet);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: white;
   border: none;
   padding: 0.7rem;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-weight: 600;
   font-size: 0.95rem;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
 .view-task-btn:hover {
-  background: var(--violet-dark);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Student view sections */
+.students-section,
+.tasks-section {
+  background: var(--base-white);
+  border-radius: 12px;
+  padding: 1.75rem;
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
+  margin-top: 2rem;
+}
+
+.students-header,
+.tasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.students-header h2,
+.tasks-header h2 {
+  font-family: 'Inter', 'SF Pro Display', -apple-system, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin: 0;
+  color: #1a1a2e;
+}
+
+.no-students,
+.no-tasks {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-style: italic;
 }
 
 @media (max-width: 768px) {
@@ -481,6 +540,11 @@
 
   .content-sections {
     grid-template-columns: 1fr;
+  }
+
+  .students-panel,
+  .tasks-panel {
+    max-height: none;
   }
 }
 

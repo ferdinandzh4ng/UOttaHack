@@ -153,8 +153,32 @@ Format your response as JSON with this structure:
       "explanation": "Brief explanation"
     }}
   ]
-}}"""
+}}
+YOU MUST HAVE {num_questions} QESTIONS AND ANSWERS!"""
 
+        # Import sentry_helper for tracking
+        try:
+            from ..sentry_helper import (
+                capture_agent_error,
+                add_agent_breadcrumb,
+                set_agent_context
+            )
+        except ImportError:
+            # Fallback for when running directly (not as package)
+            import sys
+            import os
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if parent_dir not in sys.path:
+                sys.path.insert(0, parent_dir)
+            from sentry_helper import (
+                capture_agent_error,
+                add_agent_breadcrumb,
+                set_agent_context
+            )
+        
+        # Set Sentry context
+        set_agent_context('quiz_questions_agent', 'quiz_questions', provider, model_name)
+        
         content = await self.call_llm(provider, user_prompt, system_prompt, model_name)
         
         # Parse JSON response
@@ -169,19 +193,76 @@ Format your response as JSON with this structure:
                 content = content[json_start:json_end].strip()
             
             result = json.loads(content)
+            
+            # Validate number of questions
+            questions = result.get('questions', [])
+            actual_count = len(questions)
+            
+            if actual_count != num_questions:
+                # This is a failure - capture in Sentry
+                error_msg = f"Quiz question count mismatch: requested {num_questions}, got {actual_count}"
+                error = ValueError(error_msg)
+                
+                capture_agent_error(
+                    error=error,
+                    agent_name='quiz_questions_agent',
+                    task_type='quiz_questions',
+                    provider=provider,
+                    message=error_msg,
+                    model=model_name,
+                    requested_count=num_questions,
+                    actual_count=actual_count,
+                    topic=topic,
+                    question_type=question_type
+                )
+                
+                add_agent_breadcrumb(
+                    message=f"Question count validation failed: {actual_count}/{num_questions}",
+                    category="validation",
+                    level="error",
+                    requested=num_questions,
+                    actual=actual_count
+                )
+                
+                print(f"❌ Quiz question count mismatch: requested {num_questions}, got {actual_count}", flush=True)
+            
             result['_metadata'] = {
                 'provider': provider,
                 'model': model_name,
-                'model_name': model_config['name']
+                'model_name': model_config['name'],
+                'requested_questions': num_questions,
+                'actual_questions': actual_count,
+                'question_count_match': actual_count == num_questions
             }
             return result
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            # Capture JSON parsing error
+            try:
+                from ..sentry_helper import capture_agent_error
+            except ImportError:
+                import sys
+                import os
+                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                if parent_dir not in sys.path:
+                    sys.path.insert(0, parent_dir)
+                from sentry_helper import capture_agent_error
+            
+            capture_agent_error(
+                error=e,
+                agent_name='quiz_questions_agent',
+                task_type='quiz_questions',
+                provider=provider,
+                message="Failed to parse quiz questions JSON",
+                model=model_name
+            )
+            
             return {
                 "questions": [],
                 "_metadata": {
                     'provider': provider,
                     'model': model_name,
-                    'model_name': model_config['name']
+                    'model_name': model_config['name'],
+                    'error': 'json_parse_failed'
                 }
             }
     

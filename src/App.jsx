@@ -6,6 +6,8 @@ import Dashboard from './components/Dashboard';
 import EducatorHomepage from './components/EducatorHomepage';
 import ClassDetail from './components/ClassDetail';
 import DeveloperAnalytics from './components/DeveloperAnalytics';
+import CodeIssues from './components/CodeIssues';
+import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
 function App() {
@@ -18,7 +20,22 @@ function App() {
         <Route path="/educator/home" element={<EducatorHomepage />} />
         <Route path="/class/:classId" element={<ClassDetail />} />
         <Route path="/dashboard/:role" element={<Dashboard />} />
-        <Route path="/analytics" element={<DeveloperAnalytics />} />
+        <Route 
+          path="/analytics" 
+          element={
+            <ProtectedRoute requiredRole="developer">
+              <DeveloperAnalytics />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/analytics/code" 
+          element={
+            <ProtectedRoute requiredRole="developer">
+              <CodeIssues />
+            </ProtectedRoute>
+          } 
+        />
       </Routes>
     </div>
   );

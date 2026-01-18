@@ -7,6 +7,29 @@ Handles messages from Solace event mesh topics
 import json
 from datetime import datetime
 from typing import Dict, Any, Optional
+# Import sentry_helper - try relative import first, then absolute
+try:
+    from ..sentry_helper import (
+        capture_agent_transaction,
+        set_agent_context,
+        capture_agent_error,
+        measure_latency,
+        add_agent_breadcrumb
+    )
+except ImportError:
+    # Fallback for when running directly (not as package)
+    import sys
+    import os
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    from sentry_helper import (
+        capture_agent_transaction,
+        set_agent_context,
+        capture_agent_error,
+        measure_latency,
+        add_agent_breadcrumb
+    )
 # TODO: Fix Agent import - solace_agent_mesh package API differs
 # For now, create a simple Agent base class
 # from solace_agent_mesh import Agent, Tool
@@ -133,6 +156,7 @@ class ScriptAgent(Agent, MultiModelAgent):
             await self.publish("ai/task/script/lesson/response", error_response)
             raise
     
+    @capture_agent_transaction('script_agent', 'lesson_script')
     async def generate_lesson_script(self, topic: str, length_minutes: int, provider: str = 'google', model: Optional[str] = None) -> Dict[str, Any]:
         """
         Generate a lesson script divided into slides
@@ -144,6 +168,23 @@ class ScriptAgent(Agent, MultiModelAgent):
         Returns:
             Dictionary with script and slides
         """
+        # Set Sentry context
+        model_name = model or next(
+            (m['model'] for m in self.SUPPORTED_MODELS if m['provider'] == provider),
+            'gemini-2.5-flash-lite'
+        )
+        set_agent_context('script_agent', 'lesson_script', provider, model_name)
+        
+        add_agent_breadcrumb(
+            message=f"Generating lesson script for topic: {topic}",
+            category="agent",
+            level="info",
+            topic_length=len(topic),
+            length_minutes=length_minutes,
+            provider=provider,
+            model=model_name
+        )
+        
         num_slides = max(3, length_minutes // 2)
         
         prompt = f"""Create an educational lesson script about "{topic}" that is approximately {length_minutes} minutes long when spoken.
@@ -180,28 +221,70 @@ Format your response as JSON:
         Generate engaging, educational lesson scripts that are well-structured 
         and appropriate for classroom use."""
         
-        # Use the specified provider to generate the script
-        content = await self.call_llm(provider, prompt, system_prompt, model_name)
-        
-        # Parse JSON response
+        # Use the specified provider to generate the script with latency tracking
         try:
-            # Extract JSON from markdown code blocks if present
-            if "```json" in content:
-                json_start = content.find("```json") + 7
-                json_end = content.find("```", json_start)
-                content = content[json_start:json_end].strip()
-            elif "```" in content:
-                json_start = content.find("```") + 3
-                json_end = content.find("```", json_start)
-                content = content[json_start:json_end].strip()
+            with measure_latency("backboard_api_call"):
+                content = await self.call_llm(provider, prompt, system_prompt, model_name)
             
-            result = json.loads(content)
-            result['_metadata'] = {
-                'provider': provider,
-                'model': model_name,
-                'model_name': model_config['name']
-            }
-            return result
+            add_agent_breadcrumb(
+                message="Script generation API call completed",
+                category="api",
+                level="info",
+                response_length=len(content) if content else 0
+            )
+            
+            # Parse JSON response
+            try:
+                # Extract JSON from markdown code blocks if present
+                if "```json" in content:
+                    json_start = content.find("```json") + 7
+                    json_end = content.find("```", json_start)
+                    content = content[json_start:json_end].strip()
+                elif "```" in content:
+                    json_start = content.find("```") + 3
+                    json_end = content.find("```", json_start)
+                    content = content[json_start:json_end].strip()
+                
+                result = json.loads(content)
+                result['_metadata'] = {
+                    'provider': provider,
+                    'model': model_name,
+                    'model_name': model_config['name']
+                }
+                
+                add_agent_breadcrumb(
+                    message="Script parsed successfully",
+                    category="agent",
+                    level="info",
+                    num_slides=len(result.get('slides', []))
+                )
+                
+                return result
+            except json.JSONDecodeError as e:
+                capture_agent_error(
+                    error=e,
+                    agent_name='script_agent',
+                    task_type='lesson_script',
+                    provider=provider,
+                    message="Failed to parse script response as JSON",
+                    model=model_name,
+                    response_preview=content[:200] if content else None
+                )
+                print(f"❌ JSON parsing error: {str(e)}", flush=True)
+                if content:
+                    print(f"   Response text: {content[:500]}", flush=True)
+                raise ValueError(f"Failed to parse script response as JSON: {str(e)}")
+        except Exception as e:
+            capture_agent_error(
+                error=e,
+                agent_name='script_agent',
+                task_type='lesson_script',
+                provider=provider,
+                message="Failed to generate lesson script",
+                model=model_name,
+                topic_length=len(topic)
+            )
+            raise
         except json.JSONDecodeError:
             # Fallback if JSON parsing fails
             return {

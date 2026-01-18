@@ -1,4 +1,5 @@
 import express from 'express';
+import * as Sentry from '@sentry/node';
 import Task from '../models/Task.js';
 import aiRouterService from '../services/aiRouterService.js';
 import groupingService from '../services/groupingService.js';
@@ -485,32 +486,54 @@ async function generateQuiz(taskId, topic, questionType, numQuestions, promptMod
       return 'MCQ';
     };
 
+    let questionsArray = [];
     if (questionsData.questions && Array.isArray(questionsData.questions)) {
-      task.quizData.questions = questionsData.questions.map((q, index) => ({
-        questionNumber: index + 1,
-        question: q.question || '',
-        type: getValidQuestionType(q.type, questionType),
-        options: q.options || [],
-        correctAnswer: q.correctAnswer || '',
-        explanation: q.explanation || ''
-      }));
-      console.log(`[Generate Quiz] Saved ${task.quizData.questions.length} questions to task ${taskId}`);
+      questionsArray = questionsData.questions;
     } else if (Array.isArray(questionsData)) {
-      // Handle case where questionsData is directly an array
-      task.quizData.questions = questionsData.map((q, index) => ({
-        questionNumber: index + 1,
-        question: q.question || '',
-        type: getValidQuestionType(q.type, questionType),
-        options: q.options || [],
-        correctAnswer: q.correctAnswer || '',
-        explanation: q.explanation || ''
-      }));
-      console.log(`[Generate Quiz] Saved ${task.quizData.questions.length} questions (from array) to task ${taskId}`);
+      questionsArray = questionsData;
     } else {
       // Fallback if structure is different
       console.warn('[Generate Quiz] Unexpected questions data structure:', typeof questionsData, questionsData);
-      task.quizData.questions = [];
+      questionsArray = [];
     }
+    
+    // Validate question count and report to Sentry if mismatch
+    const actualCount = questionsArray.length;
+    if (actualCount !== numQuestions) {
+      const error = new Error(`Quiz question count mismatch: requested ${numQuestions}, got ${actualCount}`);
+      
+      if (Sentry) {
+        Sentry.setTag('agent_name', 'quiz_questions_agent');
+        Sentry.setTag('provider', questionsModel.provider || 'unknown');
+        Sentry.setTag('model_name', questionsModel.model || 'unknown');
+        Sentry.setTag('service', 'quiz_generation');
+        Sentry.setTag('validation_failure', 'question_count_mismatch');
+        Sentry.setContext('quiz_validation', {
+          requested_count: numQuestions,
+          actual_count: actualCount,
+          topic: topic,
+          question_type: questionType,
+          prompt_model: promptModel.model,
+          questions_model: questionsModel.model,
+          task_id: taskId.toString(),
+        });
+        Sentry.captureException(error);
+      }
+      
+      console.error(`❌ [Generate Quiz] Question count mismatch: requested ${numQuestions}, got ${actualCount} for task ${taskId}`);
+    }
+    
+    // Map questions
+    task.quizData.questions = questionsArray.map((q, index) => ({
+      questionNumber: index + 1,
+      question: q.question || '',
+      type: getValidQuestionType(q.type, questionType),
+      options: q.options || [],
+      correctAnswer: q.correctAnswer || '',
+      explanation: q.explanation || ''
+    }));
+    
+    console.log(`[Generate Quiz] Saved ${task.quizData.questions.length} questions to task ${taskId} (requested: ${numQuestions})`);
 
     task.quizData.status = 'completed';
     await task.save();
@@ -528,6 +551,7 @@ async function generateQuiz(taskId, topic, questionType, numQuestions, promptMod
 router.get('/class/:classId', async (req, res) => {
   try {
     const { classId } = req.params;
+    const { studentId } = req.query; // Optional: filter completed quizzes for students
 
     const tasks = await Task.find({ 
       class: classId,
@@ -536,10 +560,37 @@ router.get('/class/:classId', async (req, res) => {
       .sort({ createdAt: -1 })
       .allowDiskUse(true); // Allow disk-based sorting to prevent memory limit errors
 
+    // Import StudentTaskSession and StudentGroup for filtering
+    const StudentTaskSession = (await import('../models/StudentTaskSession.js')).default;
+    const StudentGroup = (await import('../models/StudentGroup.js')).default;
+
     // Convert _id to id for consistency and include all relevant data
     const formattedTasks = await Promise.all(tasks.map(async (task) => {
       // Count variants for each parent task
       const variantCount = await Task.countDocuments({ parentTask: task._id });
+      
+      // For students, check if quiz is completed and filter it out
+      if (studentId && task.type === 'Quiz') {
+        // Find the student's group for this task
+        const group = await StudentGroup.findOne({
+          task: task._id,
+          students: studentId
+        });
+
+        if (group && group.taskVariantId) {
+          // Check if the student has completed their assigned variant
+          const completedSession = await StudentTaskSession.findOne({
+            student: studentId,
+            task: group.taskVariantId,
+            status: 'completed'
+          });
+
+          // If quiz is completed, exclude it from the list
+          if (completedSession) {
+            return null;
+          }
+        }
+      }
       
       return {
         id: task._id,
@@ -554,7 +605,10 @@ router.get('/class/:classId', async (req, res) => {
       };
     }));
 
-    res.json({ tasks: formattedTasks });
+    // Filter out null values (completed quizzes for students)
+    const filteredTasks = formattedTasks.filter(task => task !== null);
+
+    res.json({ tasks: filteredTasks });
   } catch (error) {
     console.error('Get tasks error:', error);
     res.status(500).json({ error: 'Server error fetching tasks' });
@@ -763,6 +817,31 @@ router.get('/:taskId', async (req, res) => {
   }
 });
 
+// Delete a task (and all its variants)
+router.delete('/:taskId', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // Delete all variants if this is a parent task
+    if (!task.parentTask) {
+      await Task.deleteMany({ parentTask: taskId });
+    }
+
+    // Delete the task itself
+    await Task.findByIdAndDelete(taskId);
+
+    res.json({ message: 'Task deleted successfully' });
+  } catch (error) {
+    console.error('Delete task error:', error);
+    res.status(500).json({ error: 'Server error deleting task' });
+  }
+});
+
 // Get task variant assigned to a specific student
 router.get('/:taskId/student/:studentId', async (req, res) => {
   try {
@@ -837,6 +916,9 @@ router.get('/student/:studentId', async (req, res) => {
       parentTask: null // Only get parent tasks, not variants
     }).sort({ createdAt: -1 });
 
+    // Import StudentTaskSession to check for completed quizzes
+    const StudentTaskSession = (await import('../models/StudentTaskSession.js')).default;
+
     // For each parent task, find the student's group and their assigned variant
     const tasksWithVariants = await Promise.all(
       parentTasks.map(async (parentTask) => {
@@ -878,6 +960,22 @@ router.get('/student/:studentId', async (req, res) => {
           ? await Task.findById(group.taskVariantId)
           : null;
 
+        const variantId = taskVariant ? taskVariant._id : parentTask._id;
+
+        // Check if this quiz has been completed by the student
+        if (parentTask.type === 'Quiz') {
+          const completedSession = await StudentTaskSession.findOne({
+            student: studentId,
+            task: variantId,
+            status: 'completed'
+          });
+
+          // If quiz is completed, exclude it from the list
+          if (completedSession) {
+            return null;
+          }
+        }
+
         const status = parentTask.type === 'Lesson' 
           ? (parentTask.lessonData?.status || 'pending')
           : (parentTask.quizData?.status || 'pending');
@@ -889,7 +987,7 @@ router.get('/student/:studentId', async (req, res) => {
           : 'generating';
 
         return {
-          id: taskVariant ? taskVariant._id : parentTask._id,
+          id: variantId,
           parentTaskId: parentTask._id,
           type: parentTask.type,
           topic: parentTask.topic,
@@ -908,10 +1006,40 @@ router.get('/student/:studentId', async (req, res) => {
       })
     );
 
-    res.json({ tasks: tasksWithVariants });
+    // Filter out null values (completed quizzes)
+    const filteredTasks = tasksWithVariants.filter(task => task !== null);
+
+    res.json({ tasks: filteredTasks });
   } catch (error) {
     console.error('Get student tasks error:', error);
     res.status(500).json({ error: 'Server error fetching student tasks' });
+  }
+});
+
+// Check if a quiz is already completed by a student
+router.get('/check-completion', async (req, res) => {
+  try {
+    const { taskId, studentId } = req.query;
+
+    if (!taskId || !studentId) {
+      return res.status(400).json({ error: 'Task ID and student ID are required' });
+    }
+
+    const StudentTaskSession = (await import('../models/StudentTaskSession.js')).default;
+    
+    const completedSession = await StudentTaskSession.findOne({
+      student: studentId,
+      task: taskId,
+      status: 'completed'
+    });
+
+    res.json({ 
+      completed: !!completedSession,
+      sessionId: completedSession?._id 
+    });
+  } catch (error) {
+    console.error('Check completion error:', error);
+    res.status(500).json({ error: 'Server error checking completion' });
   }
 });
 
@@ -943,6 +1071,18 @@ router.post('/submit-quiz', async (req, res) => {
 
     // Find or create StudentTaskSession
     const StudentTaskSession = (await import('../models/StudentTaskSession.js')).default;
+    
+    // Check if there's already a completed session
+    const existingCompletedSession = await StudentTaskSession.findOne({
+      student: studentId,
+      task: taskId,
+      status: 'completed'
+    });
+
+    if (existingCompletedSession) {
+      return res.status(400).json({ error: 'Quiz has already been submitted' });
+    }
+
     let session = await StudentTaskSession.findOne({
       student: studentId,
       task: taskId,

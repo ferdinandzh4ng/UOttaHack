@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { useState, useEffect, useRef } from 'react';
 import './TaskViewModal.css';
 
@@ -11,8 +10,10 @@ function TaskViewModal({ task, onClose }) {
   const [quizAnswers, setQuizAnswers] = useState({}); // Store student answers
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTaskComplete, setIsTaskComplete] = useState(false);
+  const [hasCheckedCompletion, setHasCheckedCompletion] = useState(false);
   
   const videoRef = useRef(null);
+  const previewVideoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const frameIntervalRef = useRef(null);
@@ -35,19 +36,6 @@ function TaskViewModal({ task, onClose }) {
   // For educators: show variant selector if variants exist
   const isStudent = userRole === 'student';
   const hasVariants = !isStudent && task.variants && task.variants.length > 0;
-=======
-import { useState } from 'react';
-import './TaskViewModal.css';
-
-function TaskViewModal({ task, onClose, userRole = 'student' }) {
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  
-  if (!task) return null;
-
-  // Determine which task data to display
-  const hasVariants = task.variants && task.variants.length > 0;
-  // Default to first variant if variants exist, otherwise use the task itself
->>>>>>> origin/Test
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(hasVariants ? 0 : -1);
   
   const displayTask = hasVariants && selectedVariantIndex >= 0
@@ -57,7 +45,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
   const isLesson = displayTask.type === 'Lesson';
   const slides = isLesson ? (displayTask.lessonData?.slides || []) : [];
   const currentSlide = slides[currentSlideIndex];
-<<<<<<< HEAD
   const quizQuestions = !isLesson ? (displayTask.quizData?.questions || []) : [];
 
   // Track if last slide has been viewed (for lessons)
@@ -70,13 +57,9 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
         // Lesson is complete when last slide has been viewed
         setIsTaskComplete(slides.length > 0 && lastSlideViewed);
       } else {
-        // Quiz is complete when all questions are answered and submitted
-        const allAnswered = quizQuestions.length > 0 && 
-          quizQuestions.every((q, idx) => {
-            const answerKey = idx;
-            return quizAnswers[answerKey] !== undefined && quizAnswers[answerKey] !== '';
-          });
-        setIsTaskComplete(allAnswered && isSubmitting === false); // Complete after submission
+        // Quiz is complete only after successful submission (not just when all answered)
+        // Don't auto-complete - wait for explicit submission
+        // isTaskComplete is set in handleQuizSubmit after successful API response
       }
     } else {
       // Educators can always close
@@ -90,8 +73,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
       setLastSlideViewed(true);
     }
   }, [isLesson, isStudent, currentSlideIndex, slides.length]);
-=======
->>>>>>> origin/Test
 
   // Debug logging
   console.log('[TaskViewModal] Display task:', displayTask);
@@ -134,7 +115,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
     }
   };
 
-<<<<<<< HEAD
   // Pause and reset audio when slide changes
   useEffect(() => {
     if (audioRef.current) {
@@ -157,8 +137,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
     }
   }, [currentSlideIndex, currentSlide?.speechUrl]);
 
-=======
->>>>>>> origin/Test
   const handlePrevious = () => {
     if (currentSlideIndex > 0) {
       setCurrentSlideIndex(currentSlideIndex - 1);
@@ -168,21 +146,17 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
   const handleNext = () => {
     if (currentSlideIndex < slides.length - 1) {
       setCurrentSlideIndex(currentSlideIndex + 1);
-<<<<<<< HEAD
     } else {
       // Reached last slide - task is complete
       if (isStudent) {
         setIsTaskComplete(true);
       }
-=======
->>>>>>> origin/Test
     }
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowLeft') handlePrevious();
     if (e.key === 'ArrowRight') handleNext();
-<<<<<<< HEAD
     if (e.key === 'Escape') {
       handleClose();
     }
@@ -196,6 +170,48 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
     }
   }, []);
 
+  // Check if quiz is already completed when modal opens (for students)
+  useEffect(() => {
+    const checkQuizCompletion = async () => {
+      if (!isStudent || isLesson || hasCheckedCompletion || !userRef.current || (!displayTask.id && !displayTask._id)) {
+        return;
+      }
+
+      try {
+        const taskId = displayTask.id || displayTask._id;
+        const response = await fetch(`/api/tasks/check-completion?taskId=${taskId}&studentId=${userRef.current.id}`);
+        const data = await response.json();
+        
+        if (response.ok && data.completed) {
+          // Quiz is already completed - close modal and show message
+          alert('This quiz has already been completed.');
+          handleClose();
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking quiz completion:', error);
+        // Don't block the user if check fails - let them try
+      }
+      
+      setHasCheckedCompletion(true);
+    };
+
+    if (quizQuestions.length > 0) {
+      checkQuizCompletion();
+    }
+  }, [isStudent, isLesson, displayTask.id, displayTask._id, hasCheckedCompletion, quizQuestions.length]);
+
+  // Reset quiz state when task changes
+  useEffect(() => {
+    if (task && !isLesson) {
+      // Reset quiz answers when opening a new quiz
+      setQuizAnswers({});
+      setIsTaskComplete(false);
+      setIsSubmitting(false);
+      setHasCheckedCompletion(false);
+    }
+  }, [task?.id, task?._id, isLesson]);
+
   // Start metrics collection when modal opens
   useEffect(() => {
     if (task && userRef.current && userRef.current.role === 'student') {
@@ -207,6 +223,24 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
       stopMetricsCollection();
     };
   }, [task]);
+
+  // Update preview video when stream is available
+  useEffect(() => {
+    if (previewVideoRef.current && streamRef.current && isCollectingMetrics) {
+      // Only set if not already set to avoid re-initialization
+      if (previewVideoRef.current.srcObject !== streamRef.current) {
+        previewVideoRef.current.srcObject = streamRef.current;
+      }
+      const playPromise = previewVideoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
+            console.warn('[Preview Video] Play error:', error);
+          }
+        });
+      }
+    }
+  }, [isCollectingMetrics, streamRef.current]);
 
   const startMetricsCollection = async () => {
     if (!userRef.current || userRef.current.role !== 'student') {
@@ -240,6 +274,7 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
           });
         }
       }
+
 
       // Start session with backend
       const response = await fetch('/api/metrics/session/start', {
@@ -370,6 +405,11 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
       streamRef.current = null;
     }
 
+    // Clear preview video
+    if (previewVideoRef.current) {
+      previewVideoRef.current.srcObject = null;
+    }
+
     if (sessionId && metricsStatus === 'active') {
       try {
         setMetricsStatus('stopping');
@@ -407,6 +447,11 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
   };
 
   const handleQuizAnswerChange = (questionIndex, value) => {
+    // Prevent changes if already submitted or submitting
+    if (isTaskComplete || isSubmitting) {
+      return;
+    }
+    
     setQuizAnswers(prev => ({
       ...prev,
       [questionIndex]: value
@@ -418,6 +463,11 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
       return;
     }
 
+    // Prevent double submission
+    if (isSubmitting || isTaskComplete) {
+      return;
+    }
+
     // Check if all questions are answered
     const allAnswered = quizQuestions.every((q, idx) => {
       return quizAnswers[idx] !== undefined && quizAnswers[idx] !== '';
@@ -425,6 +475,12 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
 
     if (!allAnswered) {
       alert('Please answer all questions before submitting.');
+      return;
+    }
+
+    // Double-check we have answers for all questions
+    if (quizQuestions.length === 0) {
+      alert('No questions available.');
       return;
     }
 
@@ -448,26 +504,24 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
 
       const data = await response.json();
       if (response.ok) {
-        alert('Quiz submitted successfully!');
         setIsTaskComplete(true);
+        // Close modal immediately after successful submission
+        // The parent component will refresh the task list
+        handleClose();
       } else {
         alert(`Error submitting quiz: ${data.error || 'Unknown error'}`);
+        setIsSubmitting(false);
       }
     } catch (error) {
       console.error('Error submitting quiz:', error);
       alert('Error submitting quiz. Please try again.');
-    } finally {
       setIsSubmitting(false);
     }
-=======
-    if (e.key === 'Escape') onClose();
->>>>>>> origin/Test
   };
 
   return (
     <div 
       className="task-view-overlay" 
-<<<<<<< HEAD
       onClick={(e) => {
         // Only allow closing if task is complete or user is educator
         if (isStudent && !isTaskComplete) {
@@ -476,14 +530,10 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
         }
         handleClose();
       }}
-=======
-      onClick={onClose}
->>>>>>> origin/Test
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       <div className="task-view-content" onClick={(e) => e.stopPropagation()}>
-<<<<<<< HEAD
         {/* Hidden video element for camera capture */}
         <video
           ref={videoRef}
@@ -493,6 +543,61 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
           style={{ display: 'none' }}
         />
         <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+        {/* Visible webcam feed in corner - only for students when tracking */}
+        {userRef.current?.role === 'student' && isCollectingMetrics && streamRef.current && (
+          <div className="webcam-preview" style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            width: '200px',
+            height: '150px',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            border: '2px solid #667eea',
+            zIndex: 1001,
+            backgroundColor: '#000'
+          }}>
+            <video
+              ref={previewVideoRef}
+              autoPlay
+              playsInline
+              muted
+              onLoadedMetadata={() => {
+                if (previewVideoRef.current) {
+                  previewVideoRef.current.play().catch(err => {
+                    console.warn('Preview video play error:', err);
+                  });
+                }
+              }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                transform: 'scaleX(-1)' // Mirror the video for natural selfie view
+              }}
+            />
+            <div style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              backgroundColor: 'rgba(102, 126, 234, 0.9)',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              pointerEvents: 'none'
+            }}>
+              <span>📹</span>
+              <span>Recording</span>
+            </div>
+          </div>
+        )}
 
         <div className="task-view-header">
           <div className="task-view-title-section">
@@ -512,12 +617,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
             )}
             {/* Only show variant selector for educators */}
             {hasVariants && !isStudent && (
-=======
-        <div className="task-view-header">
-          <div className="task-view-title-section">
-            <h2>{task.topic}</h2>
-            {hasVariants && (
->>>>>>> origin/Test
               <div className="variant-selector">
                 <label htmlFor="variant-select">Variant:</label>
                 <select
@@ -537,7 +636,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                 </select>
               </div>
             )}
-<<<<<<< HEAD
             {/* Show group info for students */}
             {isStudent && task.groupNumber && (
               <div className="group-info" style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
@@ -554,10 +652,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
           >
             ×
           </button>
-=======
-          </div>
-          <button className="close-btn" onClick={onClose}>×</button>
->>>>>>> origin/Test
         </div>
 
         {/* Show AI models info */}
@@ -611,23 +705,17 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                         <p style={{ fontSize: '12px', marginTop: '4px' }}>imageUrl: {currentSlide?.imageUrl || 'undefined'}</p>
                       </div>
                     )}
-<<<<<<< HEAD
                     
                     <div className="slide-script">
                       <h3>Script</h3>
                       <p>{currentSlide?.script || 'No script available'}</p>
                     </div>
-=======
->>>>>>> origin/Test
 
                     {currentSlide?.speechUrl && currentSlide.speechUrl.trim() !== '' ? (
                       <div className="slide-speech">
                         <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: '600', color: '#333' }}>Audio</h3>
                         <audio 
-<<<<<<< HEAD
                           ref={audioRef}
-=======
->>>>>>> origin/Test
                           controls 
                           src={currentSlide.speechUrl}
                           crossOrigin="anonymous"
@@ -657,7 +745,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                           onLoadedMetadata={(e) => {
                             console.log('[Audio] Metadata loaded, duration:', e.target.duration);
                           }}
-<<<<<<< HEAD
                           onPlay={(e) => {
                             // Handle play() promise to avoid interruption warnings
                             const playPromise = e.target.play();
@@ -670,8 +757,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                               });
                             }
                           }}
-=======
->>>>>>> origin/Test
                         >
                           Your browser does not support the audio element.
                         </audio>
@@ -736,7 +821,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                     <p className="question-text">{question.question}</p>
                     <p className="question-type">Type: {question.type}</p>
                     
-<<<<<<< HEAD
                     {/* Show answer input for students */}
                     {isStudent && (
                       <div className="answer-input" style={{ marginTop: '12px' }}>
@@ -747,6 +831,7 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                               <select
                                 value={quizAnswers[index] || ''}
                                 onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
+                                disabled={isTaskComplete || isSubmitting}
                                 style={{ 
                                   width: '100%', 
                                   padding: '10px', 
@@ -754,7 +839,9 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                                   marginTop: '8px',
                                   border: '1px solid #ddd',
                                   borderRadius: '4px',
-                                  cursor: 'pointer'
+                                  cursor: isTaskComplete || isSubmitting ? 'not-allowed' : 'pointer',
+                                  opacity: isTaskComplete || isSubmitting ? 0.6 : 1,
+                                  backgroundColor: isTaskComplete || isSubmitting ? '#f5f5f5' : 'white'
                                 }}
                               >
                                 <option value="">-- Select an answer --</option>
@@ -772,25 +859,27 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                           <div>
                             <label><strong>Select your answer:</strong></label>
                             <div style={{ marginTop: '8px', display: 'flex', gap: '20px' }}>
-                              <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '16px' }}>
+                              <label style={{ cursor: isTaskComplete || isSubmitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', fontSize: '16px', opacity: isTaskComplete || isSubmitting ? 0.6 : 1 }}>
                                 <input
                                   type="radio"
                                   name={`question-${index}`}
                                   value="True"
                                   checked={quizAnswers[index] === 'True'}
                                   onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
-                                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
+                                  disabled={isTaskComplete || isSubmitting}
+                                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: isTaskComplete || isSubmitting ? 'not-allowed' : 'pointer' }}
                                 />
                                 True
                               </label>
-                              <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '16px' }}>
+                              <label style={{ cursor: isTaskComplete || isSubmitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', fontSize: '16px', opacity: isTaskComplete || isSubmitting ? 0.6 : 1 }}>
                                 <input
                                   type="radio"
                                   name={`question-${index}`}
                                   value="False"
                                   checked={quizAnswers[index] === 'False'}
                                   onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
-                                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
+                                  disabled={isTaskComplete || isSubmitting}
+                                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: isTaskComplete || isSubmitting ? 'not-allowed' : 'pointer' }}
                                 />
                                 False
                               </label>
@@ -803,10 +892,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                     {/* Show options list for educators */}
                     {!isStudent && question.options && question.options.length > 0 && (
                       <div className="question-options" style={{ marginTop: '12px' }}>
-=======
-                    {question.options && question.options.length > 0 && (
-                      <div className="question-options">
->>>>>>> origin/Test
                         <h4>Options:</h4>
                         <ul>
                           {question.options.map((option, optIndex) => (
@@ -816,7 +901,6 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                       </div>
                     )}
                     
-<<<<<<< HEAD
                     {/* For Short Answer questions, show text input */}
                     {question.type === 'Short Answer' && isStudent && (
                       <div className="answer-input" style={{ marginTop: '12px' }}>
@@ -826,6 +910,7 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                             value={quizAnswers[index] || ''}
                             onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
                             placeholder="Type your answer here..."
+                            disabled={isTaskComplete || isSubmitting}
                             style={{ 
                               width: '100%', 
                               minHeight: '80px', 
@@ -834,7 +919,10 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                               marginTop: '8px',
                               fontFamily: 'inherit',
                               border: '1px solid #ddd',
-                              borderRadius: '4px'
+                              borderRadius: '4px',
+                              cursor: isTaskComplete || isSubmitting ? 'not-allowed' : 'text',
+                              opacity: isTaskComplete || isSubmitting ? 0.6 : 1,
+                              backgroundColor: isTaskComplete || isSubmitting ? '#f5f5f5' : 'white'
                             }}
                           />
                         </label>
@@ -860,49 +948,75 @@ function TaskViewModal({ task, onClose, userRole = 'student' }) {
                     {isStudent && quizAnswers[index] && (
                       <div style={{ marginTop: '12px', padding: '8px', background: '#e3f2fd', borderRadius: '4px' }}>
                         <strong>Your Answer:</strong> {quizAnswers[index]}
-=======
-                    <div className="question-answer">
-                      <strong>Correct Answer:</strong> {question.correctAnswer}
-                    </div>
-                    
-                    {question.explanation && (
-                      <div className="question-explanation">
-                        <strong>Explanation:</strong> {question.explanation}
->>>>>>> origin/Test
                       </div>
                     )}
                   </div>
                 ))}
-<<<<<<< HEAD
                 
                 {/* Submit button for students */}
                 {isStudent && (
                   <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                    <button
-                      onClick={handleQuizSubmit}
-                      disabled={isSubmitting || !quizQuestions.every((q, idx) => quizAnswers[idx] !== undefined && quizAnswers[idx] !== '')}
-                      style={{
-                        padding: '12px 24px',
-                        fontSize: '16px',
-                        backgroundColor: isSubmitting ? '#ccc' : '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                        fontWeight: 'bold'
-                      }}
-                    >
-                      {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
-                    </button>
-                    {isTaskComplete && (
-                      <p style={{ marginTop: '12px', color: '#4CAF50', fontWeight: 'bold' }}>
-                        ✓ Quiz submitted successfully!
-                      </p>
-                    )}
+                    {(() => {
+                      const allAnswered = quizQuestions.every((q, idx) => 
+                        quizAnswers[idx] !== undefined && quizAnswers[idx] !== ''
+                      );
+                      const answeredCount = quizQuestions.filter((q, idx) => 
+                        quizAnswers[idx] !== undefined && quizAnswers[idx] !== ''
+                      ).length;
+                      const isDisabled = isSubmitting || !allAnswered || isTaskComplete;
+                      
+                      return (
+                        <>
+                          {!allAnswered && (
+                            <p style={{ 
+                              marginBottom: '12px', 
+                              color: '#666', 
+                              fontSize: '14px' 
+                            }}>
+                              {answeredCount} of {quizQuestions.length} questions answered
+                            </p>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              // Only submit if button is enabled and not already complete
+                              if (!isDisabled && !isTaskComplete && !isSubmitting) {
+                                handleQuizSubmit();
+                              }
+                            }}
+                            disabled={isDisabled}
+                            style={{
+                              padding: '12px 32px',
+                              fontSize: '16px',
+                              backgroundColor: isDisabled ? '#ccc' : '#4CAF50',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: isDisabled ? 'not-allowed' : 'pointer',
+                              fontWeight: 'bold',
+                              opacity: isDisabled ? 0.6 : 1,
+                              transition: 'opacity 0.2s',
+                              minWidth: '150px'
+                            }}
+                          >
+                            {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+                          </button>
+                          {isTaskComplete && (
+                            <p style={{ 
+                              marginTop: '12px', 
+                              color: '#4CAF50', 
+                              fontWeight: 'bold',
+                              fontSize: '16px'
+                            }}>
+                              ✓ Quiz submitted successfully!
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
-=======
->>>>>>> origin/Test
               </div>
             ) : (
               <div className="no-questions">

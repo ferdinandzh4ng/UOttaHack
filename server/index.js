@@ -161,14 +161,33 @@ app.post('/api/ai-router/config', async (req, res) => {
   }
 });
 
+// Serve static files from Vite build in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '..', 'dist')));
+  
+  // Handle React Router - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API route not found' });
+    }
+    res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  });
+}
+
 // Sentry error handler must be after routes
 if (SENTRY_DSN) {
   app.use(Sentry.Handlers.errorHandler());
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Only listen on PORT if not in Vercel (Vercel handles this)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
+// Export for Vercel serverless
+export default app;
 export { Sentry };
 

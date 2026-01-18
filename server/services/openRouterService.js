@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as Sentry from '@sentry/node';
 
 /**
  * OpenRouter Service - Unified service for all AI API calls through OpenRouter
@@ -29,6 +30,24 @@ class OpenRouterService {
       throw new Error('OpenRouter API key not configured');
     }
 
+    // Parse model to get provider and model name
+    const [provider, modelName] = model.includes('/') ? model.split('/') : ['openai', model];
+    
+    // Start Sentry transaction for tracking
+    const transaction = Sentry?.startTransaction({
+      op: 'ai.generate',
+      name: `openrouter.${provider}.${modelName}`,
+    });
+
+    // Set tags for filtering in Sentry
+    if (Sentry) {
+      Sentry.setTag('provider', provider);
+      Sentry.setTag('model_name', modelName);
+      Sentry.setTag('service', 'openrouter');
+      Sentry.setTag('model', model);
+    }
+
+    const startTime = Date.now();
     const messages = [];
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
@@ -50,8 +69,54 @@ class OpenRouterService {
         }
       );
 
-      return response.data.choices[0].message.content;
+      const duration = Date.now() - startTime;
+      const content = response.data.choices[0].message.content;
+
+      // Record success metrics
+      if (transaction) {
+        transaction.setStatus('ok');
+        transaction.setData('duration_ms', duration);
+        transaction.setData('success', true);
+        transaction.setData('response_length', content.length);
+        transaction.setData('tokens_used', response.data.usage?.total_tokens || 0);
+        transaction.finish();
+      }
+
+      // Add measurement for analytics
+      if (Sentry) {
+        Sentry.setMeasurement('ai_latency', duration, 'millisecond');
+        Sentry.setMeasurement('response_length', content.length, 'none');
+        if (response.data.usage?.total_tokens) {
+          Sentry.setMeasurement('tokens_used', response.data.usage.total_tokens, 'none');
+        }
+      }
+
+      return content;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      // Record error metrics
+      if (transaction) {
+        transaction.setStatus('internal_error');
+        transaction.setData('duration_ms', duration);
+        transaction.setData('success', false);
+        transaction.setData('error_type', error.response?.status || 'unknown');
+        transaction.finish();
+      }
+
+      // Capture error with context
+      if (Sentry) {
+        Sentry.setContext('ai_error', {
+          provider: provider,
+          model: modelName,
+          full_model: model,
+          duration_ms: duration,
+          error_status: error.response?.status,
+          error_message: error.message,
+        });
+        Sentry.captureException(error);
+      }
+
       console.error('OpenRouter text generation error:', error.response?.data || error.message);
       throw new Error(`OpenRouter generation failed: ${error.response?.data?.error?.message || error.message}`);
     }

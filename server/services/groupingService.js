@@ -56,14 +56,6 @@ class GroupingService {
       // Removed Google/Gemini models - using Claude and GPT only
       quiz: [
         {
-          quizPromptModel: { provider: 'anthropic', model: 'anthropic/claude-3-5-sonnet-20241022', name: 'Anthropic Claude 3.5 Sonnet' },
-          quizQuestionsModel: { provider: 'anthropic', model: 'anthropic/claude-3-5-sonnet-20241022', name: 'Anthropic Claude 3.5 Sonnet' }
-        },
-        {
-          quizPromptModel: { provider: 'anthropic', model: 'anthropic/claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' },
-          quizQuestionsModel: { provider: 'anthropic', model: 'anthropic/claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' }
-        },
-        {
           quizPromptModel: { provider: 'openai', model: 'openai/gpt-4o', name: 'OpenAI GPT-4o' },
           quizQuestionsModel: { provider: 'openai', model: 'openai/gpt-4o', name: 'OpenAI GPT-4o' }
         },
@@ -97,6 +89,168 @@ class GroupingService {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled;
+  }
+
+  /**
+   * Convert a combo object to an agentCombo string identifier
+   * Matches the format used in surveyMonkeyService.buildAgentComboString
+   * Format: "provider:model+provider:model" (e.g., "google:gemini-2.5-flash+openai:gpt-5-image-mini")
+   * @param {Object} combo - Combo object with model info
+   * @param {String} taskType - 'Lesson' or 'Quiz'
+   * @returns {String} Agent combo string
+   */
+  comboToAgentComboString(combo, taskType) {
+    if (taskType === 'Lesson') {
+      const script = combo.scriptModel;
+      const image = combo.imageModel;
+      
+      // Build combo with full model names (matching surveyMonkeyService format)
+      const scriptCombo = script?.model 
+        ? `${script.provider || 'unknown'}:${script.model}`
+        : script?.provider || null;
+      
+      const imageCombo = image?.model
+        ? `${image.provider || 'unknown'}:${image.model}`
+        : image?.provider || null;
+      
+      if (scriptCombo && imageCombo) {
+        return `${scriptCombo}+${imageCombo}`;
+      }
+      if (scriptCombo) {
+        return scriptCombo;
+      }
+      if (imageCombo) {
+        return imageCombo;
+      }
+      return 'unknown';
+    } else {
+      const questions = combo.quizQuestionsModel;
+      const prompt = combo.quizPromptModel;
+      
+      // Build combo with full model names (matching surveyMonkeyService format)
+      const questionsCombo = questions?.model
+        ? `${questions.provider || 'unknown'}:${questions.model}`
+        : questions?.provider || null;
+      
+      const promptCombo = prompt?.model
+        ? `${prompt.provider || 'unknown'}:${prompt.model}`
+        : prompt?.provider || null;
+      
+      if (questionsCombo && promptCombo) {
+        return `${questionsCombo}+${promptCombo}`;
+      }
+      if (questionsCombo) {
+        return questionsCombo;
+      }
+      if (promptCombo) {
+        return promptCombo;
+      }
+      return 'unknown';
+    }
+  }
+
+  /**
+   * Weighted random selection based on performance scores
+   * Uses exponential weighting to create smooth probability distribution
+   * @param {Array} combos - Array of combo objects with performance scores
+   * @returns {Object} Selected combo
+   */
+  weightedRandomSelect(combos) {
+    if (combos.length === 0) return null;
+    if (combos.length === 1) return combos[0].combo;
+
+    // Extract scores and apply exponential weighting (temperature = 0.5)
+    // Higher temperature = more uniform distribution, lower = more focused on top performers
+    // Temperature 0.5 gives good balance: 0.8 vs 0.7 score ≈ 60/40 probability split
+    const temperature = 0.5;
+    const weights = combos.map(item => {
+      // Use performance score, default to 0.5 if no data
+      const score = item.performanceScore || 0.5;
+      // Apply exponential weighting: e^(score/temperature)
+      // This ensures smooth distribution (0.8 vs 0.7 won't be 99/1 but more like 60/40)
+      return Math.exp(score / temperature);
+    });
+
+    // Normalize weights to probabilities
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    const probabilities = weights.map(w => w / totalWeight);
+
+    // Create cumulative distribution
+    const cumulative = [];
+    let sum = 0;
+    for (let i = 0; i < probabilities.length; i++) {
+      sum += probabilities[i];
+      cumulative.push(sum);
+    }
+
+    // Random selection
+    const random = Math.random();
+    for (let i = 0; i < cumulative.length; i++) {
+      if (random <= cumulative[i]) {
+        return combos[i].combo;
+      }
+    }
+
+    // Fallback to last item
+    return combos[combos.length - 1].combo;
+  }
+
+  /**
+   * Get performance scores for available combos
+   * @param {Array} combos - Available combo objects
+   * @param {String} taskType - 'Lesson' or 'Quiz'
+   * @param {Object} taskContext - Task context (topic, gradeLevel, subject, etc.)
+   * @returns {Promise<Array>} Array of {combo, performanceScore, agentComboString}
+   */
+  async getComboPerformanceScores(combos, taskType, taskContext) {
+    try {
+      const AgentPerformance = (await import('../models/AgentPerformance.js')).default;
+      
+      // Map each combo to its agentCombo string
+      const comboMappings = combos.map(combo => ({
+        combo,
+        agentComboString: this.comboToAgentComboString(combo, taskType)
+      }));
+
+      // Query performance data for matching combos
+      const agentComboStrings = comboMappings.map(m => m.agentComboString);
+      
+      const performanceProfiles = await AgentPerformance.find({
+        agentCombo: { $in: agentComboStrings },
+        taskType: taskType,
+        gradeLevel: taskContext.gradeLevel,
+        subject: taskContext.subject,
+        status: 'active',
+        sessionCount: { $gte: 1 } // At least 1 session for some data
+      });
+
+      // Create a map of agentCombo -> performanceScore
+      const performanceMap = {};
+      performanceProfiles.forEach(profile => {
+        // If we have multiple profiles for same combo, use the best one
+        if (!performanceMap[profile.agentCombo] || 
+            profile.performanceScore > performanceMap[profile.agentCombo]) {
+          performanceMap[profile.agentCombo] = profile.performanceScore;
+        }
+      });
+
+      // Return combos with their performance scores
+      return comboMappings.map(mapping => ({
+        combo: mapping.combo,
+        performanceScore: performanceMap[mapping.agentComboString] || null,
+        agentComboString: mapping.agentComboString,
+        hasData: performanceMap[mapping.agentComboString] !== undefined
+      }));
+    } catch (error) {
+      console.error('[Grouping] Error getting combo performance scores:', error);
+      // Return combos with no performance data
+      return combos.map(combo => ({
+        combo,
+        performanceScore: null,
+        agentComboString: this.comboToAgentComboString(combo, taskType),
+        hasData: false
+      }));
+    }
   }
 
   /**
@@ -155,124 +309,59 @@ class GroupingService {
         throw new Error(`No AI combos available for task type: ${taskType}`);
       }
 
+      // Get task info for context
+      const Task = (await import('../models/Task.js')).default;
+      const task = await Task.findById(taskId);
+      
+      const taskContext = {
+        topic: task?.topic || 'unknown',
+        taskType: taskType,
+        gradeLevel: classData.gradeLevel,
+        subject: classData.subject,
+        purpose: taskType === 'Lesson' ? 'Conceptual' : 'Assessment',
+        length: 'Unknown'
+      };
+
+      // Get performance scores for all available combos
+      let comboPerformanceData = [];
+      try {
+        comboPerformanceData = await this.getComboPerformanceScores(combos, taskType, taskContext);
+        console.log(`[Grouping] Found performance data for ${comboPerformanceData.filter(d => d.hasData).length}/${comboPerformanceData.length} combos`);
+      } catch (error) {
+        console.error('[Grouping] Error getting combo performance scores:', error);
+        // Fallback: create data without performance scores
+        comboPerformanceData = combos.map(combo => ({
+          combo,
+          performanceScore: null,
+          agentComboString: this.comboToAgentComboString(combo, taskType),
+          hasData: false
+        }));
+      }
+
+      // Normalize performance scores: assign default score (0.5) to combos without data
+      // This ensures all combos are included in weighted selection, but those without data get lower weight
+      const normalizedComboData = comboPerformanceData.map(item => ({
+        combo: item.combo,
+        performanceScore: item.performanceScore !== null ? item.performanceScore : 0.5,
+        agentComboString: item.agentComboString,
+        hasData: item.hasData
+      }));
+
       // Create StudentGroup records with assigned AI combos
       const createdGroups = [];
       
       for (let i = 0; i < studentGroups.length; i++) {
         const group = studentGroups[i];
         
-        // A/B Testing: Use feedback-based agent selection
-        // Try to get top performing combos from feedback data
-        let combo = null;
+        // Use weighted random selection based on performance scores
+        // All combos are included, but those with better scores get higher probability
+        const combo = this.weightedRandomSelect(normalizedComboData);
+        const selectedData = normalizedComboData.find(d => d.combo === combo);
         
-        try {
-          // Get task info for context
-          const Task = (await import('../models/Task.js')).default;
-          const task = await Task.findById(taskId);
-          
-          // Use agent selection service to get top combos
-          const topCombos = await agentSelectionService.getTopAgentCombos({
-            topic: task?.topic || 'unknown',
-            taskType: taskType,
-            gradeLevel: classData.gradeLevel,
-            subject: classData.subject,
-            purpose: taskType === 'Lesson' ? 'Conceptual' : 'Assessment',
-            length: 'Unknown' // Could be enhanced to use actual task length
-          }, 5);
-
-          // If we have feedback-based recommendations, use them
-          if (topCombos.length > 0) {
-            // Select combo based on group index (round-robin through top performers)
-            const selectedCombo = topCombos[i % topCombos.length];
-            const comboString = selectedCombo.agentCombo?.primary?.provider || 
-                               (typeof selectedCombo.agentCombo === 'string' ? selectedCombo.agentCombo : null);
-            
-            if (comboString) {
-              // Find matching combo from available combos
-              const providers = comboString.split('+');
-              const matchingCombo = combos.find(c => {
-                if (taskType === 'Lesson') {
-                  return providers.includes(c.scriptModel?.provider) || 
-                         providers.includes(c.imageModel?.provider);
-                } else {
-                  return providers.includes(c.quizQuestionsModel?.provider) || 
-                         providers.includes(c.quizPromptModel?.provider);
-                }
-              });
-              
-              if (matchingCombo) {
-                combo = matchingCombo;
-                console.log(`[Grouping] Using feedback-based combo for group ${i + 1}: ${comboString} (score: ${selectedCombo.performance?.score?.toFixed(2) || 'N/A'})`);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('[Grouping] Error getting feedback-based combos:', error);
-        }
-
-        // Fallback: Try student-specific recommendations
-        if (!combo) {
-          // Get recommendations for each student and find the most common best model
-          const recommendations = await Promise.all(
-            group.map(async (studentId) => {
-              try {
-                const rec = await modelRecommendationService.getBestModelForStudent(
-                  studentId,
-                  taskType,
-                  classData.gradeLevel,
-                  classData.subject
-                );
-                return rec;
-              } catch (error) {
-                console.error(`Error getting recommendation for student ${studentId}:`, error);
-                return null;
-              }
-            })
-          );
-
-          // Count model occurrences
-          const modelCounts = {};
-          recommendations.forEach(rec => {
-            if (rec && rec.model) {
-              const key = `${rec.provider}/${rec.model}`;
-              modelCounts[key] = (modelCounts[key] || 0) + 1;
-            }
-          });
-
-          // Find the most recommended model for this group
-          let bestModelKey = null;
-          let maxCount = 0;
-          for (const [key, count] of Object.entries(modelCounts)) {
-            if (count > maxCount) {
-              maxCount = count;
-              bestModelKey = key;
-            }
-          }
-
-          // If we have a recommendation, try to match it to a combo
-          if (bestModelKey && maxCount > 0) {
-            const [provider, model] = bestModelKey.split('/');
-            const recommendedCombo = combos.find(c => {
-              if (taskType === 'Lesson') {
-                return c.scriptModel?.provider === provider && 
-                       (c.scriptModel?.model === model || c.scriptModel?.model?.includes(model));
-              } else {
-                return c.quizQuestionsModel?.provider === provider && 
-                       (c.quizQuestionsModel?.model === model || c.quizQuestionsModel?.model?.includes(model));
-              }
-            });
-
-            if (recommendedCombo) {
-              combo = recommendedCombo;
-              console.log(`[Grouping] Using recommended model for group ${i + 1}: ${bestModelKey} (${maxCount}/${group.length} students)`);
-            }
-          }
-        }
-
-        // Final fallback: cycle through available combos (ensures A/B testing diversity)
-        if (!combo) {
-          combo = combos[i % combos.length];
-          console.log(`[Grouping] Using fallback combo for group ${i + 1} (A/B testing)`);
+        if (selectedData.hasData) {
+          console.log(`[Grouping] Group ${i + 1}: Weighted selection - ${selectedData.agentComboString} (score: ${selectedData.performanceScore.toFixed(3)})`);
+        } else {
+          console.log(`[Grouping] Group ${i + 1}: Weighted selection - ${selectedData.agentComboString} (no data, using default weight)`);
         }
 
         const studentGroup = new StudentGroup({

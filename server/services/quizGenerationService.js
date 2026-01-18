@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as Sentry from '@sentry/node';
 
 class QuizGenerationService {
   constructor() {
@@ -104,7 +105,43 @@ Format your response as JSON with this structure:
       );
       
       const content = response.data.choices[0].message.content;
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      
+      // Validate number of questions
+      const questions = parsed.questions || [];
+      const actualCount = questions.length;
+      
+      if (actualCount !== numQuestions) {
+        // This is a failure - capture in Sentry
+        const error = new Error(`Quiz question count mismatch: requested ${numQuestions}, got ${actualCount}`);
+        
+        if (Sentry) {
+          Sentry.setTag('agent_name', 'quiz_questions_agent');
+          Sentry.setTag('provider', provider || 'unknown');
+          Sentry.setTag('model_name', model || 'unknown');
+          Sentry.setTag('service', 'quiz_generation');
+          Sentry.setContext('quiz_validation', {
+            requested_count: numQuestions,
+            actual_count: actualCount,
+            topic: topic,
+            question_type: questionType,
+            model: model,
+            provider: provider,
+          });
+          Sentry.captureException(error);
+        }
+        
+        console.error(`❌ Quiz question count mismatch: requested ${numQuestions}, got ${actualCount}`);
+      }
+      
+      // Add metadata about validation
+      parsed._metadata = {
+        requested_questions: numQuestions,
+        actual_questions: actualCount,
+        question_count_match: actualCount === numQuestions
+      };
+      
+      return parsed;
     } catch (error) {
       console.error('Quiz generation error:', error.response?.data || error.message);
       throw error;

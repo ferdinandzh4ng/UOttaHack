@@ -125,9 +125,28 @@ function EducatorHomepage() {
       <div className="educator-content">
         <div className="educator-header">
           <h1>Welcome, {user.username}!</h1>
-          <button className="logout-btn" onClick={handleLogout}>
-            Logout
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            {user.role === 'developer' && (
+              <button 
+                onClick={() => navigate('/analytics')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #667eea',
+                  backgroundColor: '#667eea',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500
+                }}
+              >
+                📊 Analytics
+              </button>
+            )}
+            <button className="logout-btn" onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
         </div>
 
         <div className="educator-actions">

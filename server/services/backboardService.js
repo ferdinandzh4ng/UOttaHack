@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Sentry } from '../index.js';
+import * as Sentry from '@sentry/node';
 
 /**
  * Backboard.io Service - Unified service for all AI API calls through Backboard.io
@@ -117,6 +117,22 @@ class BackboardService {
       throw new Error('Backboard API key not configured');
     }
 
+    // Start Sentry transaction for tracking
+    const transaction = Sentry?.startTransaction({
+      op: 'ai.generate',
+      name: `backboard.${llmProvider}.${modelName}`,
+    });
+
+    // Set tags for filtering in Sentry
+    if (Sentry) {
+      Sentry.setTag('provider', llmProvider);
+      Sentry.setTag('model_name', modelName);
+      Sentry.setTag('service', 'backboard');
+      Sentry.setTag('model', `${llmProvider}/${modelName}`);
+    }
+
+    const startTime = Date.now();
+
     try {
       const assistantName = `${llmProvider}_${modelName}`;
       const assistantId = await this._getOrCreateAssistant(assistantName, systemPrompt || "A helpful assistant");
@@ -137,8 +153,49 @@ class BackboardService {
         }
       );
 
-      return response.data.content || response.data.message?.content || '';
+      const duration = Date.now() - startTime;
+      const content = response.data.content || response.data.message?.content || '';
+
+      // Record success metrics
+      if (transaction) {
+        transaction.setStatus('ok');
+        transaction.setData('duration_ms', duration);
+        transaction.setData('success', true);
+        transaction.setData('response_length', content.length);
+        transaction.finish();
+      }
+
+      // Add measurement for analytics
+      if (Sentry) {
+        Sentry.setMeasurement('ai_latency', duration, 'millisecond');
+        Sentry.setMeasurement('response_length', content.length, 'none');
+      }
+
+      return content;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      // Record error metrics
+      if (transaction) {
+        transaction.setStatus('internal_error');
+        transaction.setData('duration_ms', duration);
+        transaction.setData('success', false);
+        transaction.setData('error_type', error.response?.status || 'unknown');
+        transaction.finish();
+      }
+
+      // Capture error with context
+      if (Sentry) {
+        Sentry.setContext('ai_error', {
+          provider: llmProvider,
+          model: modelName,
+          duration_ms: duration,
+          error_status: error.response?.status,
+          error_message: error.message,
+        });
+        Sentry.captureException(error);
+      }
+
       console.error('Backboard.io text generation error:', error.response?.data || error.message);
       throw new Error(`Backboard.io generation failed: ${error.response?.data?.error?.message || error.message}`);
     }

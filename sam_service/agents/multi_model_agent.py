@@ -43,6 +43,27 @@ class MultiModelAgent(ABC):
     
     async def call_llm(self, provider: str, prompt: str, system_prompt: str = None, model: str = None) -> str:
         """Call the appropriate LLM via Backboard.io - all models go through Backboard.io"""
+        # Import sentry_helper - try relative import first, then absolute
+        try:
+            from ..sentry_helper import measure_latency, add_agent_breadcrumb
+        except ImportError:
+            # Fallback for when running directly (not as package)
+            import sys
+            import os
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if parent_dir not in sys.path:
+                sys.path.insert(0, parent_dir)
+            from sentry_helper import measure_latency, add_agent_breadcrumb
+        
+        # Track LLM call
+        add_agent_breadcrumb(
+            message=f"Calling LLM: {provider}/{model}",
+            category="api",
+            level="info",
+            provider=provider,
+            model=model,
+            prompt_length=len(prompt)
+        )
         # Map provider to Backboard.io format
         # Backboard.io uses provider names like "openai", "google", "anthropic"
         # Note: If Backboard.io account only supports certain models (e.g., Korean models),

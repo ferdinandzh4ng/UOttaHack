@@ -12,8 +12,8 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    if (role !== 'educator' && role !== 'student') {
-      return res.status(400).json({ error: 'Role must be either educator or student' });
+    if (role !== 'educator' && role !== 'student' && role !== 'developer') {
+      return res.status(400).json({ error: 'Role must be either educator, student, or developer' });
     }
 
     // Check if user already exists

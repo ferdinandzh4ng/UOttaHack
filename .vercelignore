@@ -1,0 +1,9 @@
+node_modules
+.env
+.env.local
+.git
+.sentryclirc
+sam_service
+*.log
+.DS_Store
+
