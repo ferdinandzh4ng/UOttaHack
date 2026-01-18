@@ -26,20 +26,16 @@ from .multi_model_agent import MultiModelAgent
 class QuizPromptAgent(Agent, MultiModelAgent):
     """Agent that generates quiz prompts with multiple model support"""
     
-    # Supported models for quiz prompt generation (all via Backboard.io)
-    # Models are from Backboard.io Model Library: https://backboard.io
+    # Supported models for quiz prompt generation - ONLY OpenAI and Anthropic (NO GEMINI)
     SUPPORTED_MODELS = [
-        {'provider': 'google', 'model': 'gemini-2.5-flash-lite', 'name': 'Google Gemini 2.5 Flash Lite', 'uses_credits': True},
-        {'provider': 'google', 'model': 'gemini-2.5-flash', 'name': 'Google Gemini 2.5 Flash', 'uses_credits': True},
-        {'provider': 'google', 'model': 'gemini-2.5-pro', 'name': 'Google Gemini 2.5 Pro', 'uses_credits': True},
+        {'provider': 'anthropic', 'model': 'claude-3-7-sonnet-20250219', 'name': 'Anthropic Claude 3.7 Sonnet', 'uses_credits': True},
         {'provider': 'openai', 'model': 'gpt-4o', 'name': 'OpenAI GPT-4o', 'uses_credits': True},
         {'provider': 'openai', 'model': 'gpt-5', 'name': 'OpenAI GPT-5', 'uses_credits': True},
         {'provider': 'openai', 'model': 'gpt-5-mini', 'name': 'OpenAI GPT-5 Mini', 'uses_credits': True},
-        {'provider': 'anthropic', 'model': 'claude-3-7-sonnet-20250219', 'name': 'Anthropic Claude 3.7 Sonnet', 'uses_credits': True},
     ]
     
     def __init__(self):
-        MultiModelAgent.__init__(self, "quiz_prompt_agent", ['google', 'openai', 'anthropic'])
+        MultiModelAgent.__init__(self, "quiz_prompt_agent", ['anthropic', 'openai'])
         Agent.__init__(
             self,
             name="quiz_prompt_agent",
@@ -50,7 +46,7 @@ class QuizPromptAgent(Agent, MultiModelAgent):
         
         self.register_tool(self.generate_quiz_prompt)
     
-    async def generate_quiz_prompt(self, topic: str, question_type: str, num_questions: int, provider: str = 'openai', model: Optional[str] = None) -> str:
+    async def generate_quiz_prompt(self, topic: str, question_type: str, num_questions: int, provider: str = 'anthropic', model: Optional[str] = None) -> str:
         """
         Generate a quiz prompt
         
@@ -92,20 +88,16 @@ class QuizPromptAgent(Agent, MultiModelAgent):
 class QuizQuestionsAgent(Agent, MultiModelAgent):
     """Agent that generates quiz questions and answers with multiple model support"""
     
-    # Supported models for quiz question generation (all via Backboard.io)
-    # Models are from Backboard.io Model Library: https://backboard.io
+    # Supported models for quiz question generation - ONLY OpenAI and Anthropic (NO GEMINI)
     SUPPORTED_MODELS = [
-        {'provider': 'google', 'model': 'gemini-2.5-flash-lite', 'name': 'Google Gemini 2.5 Flash Lite', 'uses_credits': True},
-        {'provider': 'google', 'model': 'gemini-2.5-flash', 'name': 'Google Gemini 2.5 Flash', 'uses_credits': True},
-        {'provider': 'google', 'model': 'gemini-2.5-pro', 'name': 'Google Gemini 2.5 Pro', 'uses_credits': True},
+        {'provider': 'anthropic', 'model': 'claude-3-7-sonnet-20250219', 'name': 'Anthropic Claude 3.7 Sonnet', 'uses_credits': True},
         {'provider': 'openai', 'model': 'gpt-4o', 'name': 'OpenAI GPT-4o', 'uses_credits': True},
         {'provider': 'openai', 'model': 'gpt-5', 'name': 'OpenAI GPT-5', 'uses_credits': True},
         {'provider': 'openai', 'model': 'gpt-5-mini', 'name': 'OpenAI GPT-5 Mini', 'uses_credits': True},
-        {'provider': 'anthropic', 'model': 'claude-3-7-sonnet-20250219', 'name': 'Anthropic Claude 3.7 Sonnet', 'uses_credits': True},
     ]
     
     def __init__(self):
-        MultiModelAgent.__init__(self, "quiz_questions_agent", ['google', 'openai', 'anthropic'])
+        MultiModelAgent.__init__(self, "quiz_questions_agent", ['anthropic', 'openai'])
         Agent.__init__(
             self,
             name="quiz_questions_agent",
@@ -117,7 +109,7 @@ class QuizQuestionsAgent(Agent, MultiModelAgent):
         self.register_tool(self.generate_quiz_questions)
     
     async def generate_quiz_questions(self, quiz_prompt: str, topic: str, question_type: str, num_questions: int, provider: str = 'openai', model: Optional[str] = None) -> Dict[str, Any]:
-        """
+        """anthropic
         Generate quiz questions and answers
         
         Args:

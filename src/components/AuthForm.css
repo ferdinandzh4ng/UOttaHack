@@ -63,9 +63,10 @@
 }
 
 .form-group label {
-  color: #333;
-  font-weight: 600;
-  font-size: 0.95rem;
+  color: #1f2937;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.2px;
 }
 
 .form-group input {
@@ -74,11 +75,22 @@
   border-radius: 10px;
   font-size: 1rem;
   transition: border-color 0.3s;
+  background: white !important;
+  background-color: white !important;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.form-group input::placeholder {
+  color: #9ca3af;
+  opacity: 1;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #667eea;
+  background: white !important;
+  background-color: white !important;
 }
 
 .error-message {

@@ -1,34 +1,53 @@
-import backboardService from './backboardService.js';
+import axios from 'axios';
 
 class QuizGenerationService {
   constructor() {
     this.provider = process.env.QUIZ_GEN_PROVIDER || 'openai';
+    this.openRouterKey = process.env.OPENROUTER_API_KEY;
   }
 
   /**
-   * Generate quiz prompt using AI LLM via Backboard.io
+   * Generate quiz prompt using OpenRouter (Claude or GPT-4)
    */
   async generateQuizPrompt(topic, questionType, numQuestions, provider = null, model = null) {
     const prompt = `Create a comprehensive quiz prompt for generating ${numQuestions} ${questionType} questions about ${topic}. The prompt should be detailed enough to generate high-quality educational questions.`;
     
     try {
-      const useProvider = provider || this.provider;
-      const { llmProvider, modelName } = backboardService.mapProviderToModel(useProvider, model);
-      return await backboardService.generateText(prompt, null, llmProvider, modelName, {
-        timeout: 120000
-      });
+      // Use Claude 3.5 Sonnet or GPT-4o via OpenRouter directly
+      const modelToUse = model || 'anthropic/claude-3.5-sonnet';
+      
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: modelToUse,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.openRouterKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.OPENROUTER_REFERER || 'http://localhost:3001'
+          },
+          timeout: 120000
+        }
+      );
+      
+      return response.data.choices[0].message.content;
     } catch (error) {
-      console.error('Quiz prompt generation error:', error);
+      console.error('Quiz prompt generation error:', error.response?.data || error.message);
       throw error;
     }
   }
 
   /**
-   * Generate quiz questions and answers using AI LLM via Backboard.io
+   * Generate quiz questions and answers using OpenRouter (Claude or GPT-4)
    */
   async generateQuizQuestions(quizPrompt, topic, questionType, numQuestions, provider = null, model = null) {
-    const systemPrompt = `You are an expert educational content creator. Generate high-quality quiz questions based on the provided prompt.`;
-    
     const userPrompt = `Topic: ${topic}
 Question Type: ${questionType}
 Number of Questions: ${numQuestions}
@@ -56,17 +75,41 @@ Format your response as JSON with this structure:
 }`;
 
     try {
-      const useProvider = provider || this.provider;
-      const { llmProvider, modelName } = backboardService.mapProviderToModel(useProvider, model);
-      return await backboardService.generateJSON(userPrompt, systemPrompt, llmProvider, modelName, {
-        timeout: 120000
-      });
+      // Use Claude 3.5 Sonnet or GPT-4o via OpenRouter directly
+      const modelToUse = model || 'anthropic/claude-3.5-sonnet';
+      
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: modelToUse,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert educational content creator. Generate high-quality quiz questions based on the provided prompt. Always respond with valid JSON.'
+            },
+            {
+              role: 'user',
+              content: userPrompt
+            }
+          ]
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.openRouterKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.OPENROUTER_REFERER || 'http://localhost:3001'
+          },
+          timeout: 120000
+        }
+      );
+      
+      const content = response.data.choices[0].message.content;
+      return JSON.parse(content);
     } catch (error) {
-      console.error('Quiz questions generation error:', error);
+      console.error('Quiz generation error:', error.response?.data || error.message);
       throw error;
     }
   }
-
 }
 
 export default new QuizGenerationService();

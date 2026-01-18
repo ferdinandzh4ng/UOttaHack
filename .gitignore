@@ -12,7 +12,11 @@ dist
 dist-ssr
 *.local
 
+./venv/
+
 .env
+
+.env.example
 
 # Uploads directory
 server/uploads/

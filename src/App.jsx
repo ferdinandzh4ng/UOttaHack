@@ -5,6 +5,7 @@ import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
 import EducatorHomepage from './components/EducatorHomepage';
 import ClassDetail from './components/ClassDetail';
+import DeveloperAnalytics from './components/DeveloperAnalytics';
 import './App.css';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
         <Route path="/educator/home" element={<EducatorHomepage />} />
         <Route path="/class/:classId" element={<ClassDetail />} />
         <Route path="/dashboard/:role" element={<Dashboard />} />
+        <Route path="/analytics" element={<DeveloperAnalytics />} />
       </Routes>
     </div>
   );

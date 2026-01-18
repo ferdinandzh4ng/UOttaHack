@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Sentry } from '../index.js';
 
 /**
  * Backboard.io Service - Unified service for all AI API calls through Backboard.io
