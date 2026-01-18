@@ -915,5 +915,79 @@ router.get('/student/:studentId', async (req, res) => {
   }
 });
 
+// Submit quiz answers
+router.post('/submit-quiz', async (req, res) => {
+  try {
+    const { taskId, studentId, answers } = req.body;
+
+    if (!taskId || !studentId || !answers || !Array.isArray(answers)) {
+      return res.status(400).json({ error: 'Task ID, student ID, and answers array are required' });
+    }
+
+    // Get the task
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    if (task.type !== 'Quiz') {
+      return res.status(400).json({ error: 'Task is not a quiz' });
+    }
+
+    // Get class info
+    const Class = (await import('../models/Class.js')).default;
+    const classData = await Class.findById(task.class);
+    if (!classData) {
+      return res.status(404).json({ error: 'Class not found' });
+    }
+
+    // Find or create StudentTaskSession
+    const StudentTaskSession = (await import('../models/StudentTaskSession.js')).default;
+    let session = await StudentTaskSession.findOne({
+      student: studentId,
+      task: taskId,
+      status: 'active'
+    });
+
+    if (!session) {
+      // Create new session if it doesn't exist
+      session = new StudentTaskSession({
+        student: studentId,
+        task: taskId,
+        class: task.class,
+        taskType: 'Quiz',
+        gradeLevel: classData.gradeLevel,
+        subject: classData.subject,
+        aiModels: task.aiModels || {},
+        startTime: new Date(),
+        status: 'active'
+      });
+    }
+
+    // Store quiz answers
+    session.quizAnswers = answers.map(ans => ({
+      questionNumber: ans.questionNumber,
+      answer: ans.answer,
+      submittedAt: new Date()
+    }));
+
+    // Mark session as completed
+    session.endTime = new Date();
+    session.duration = Math.floor((session.endTime - session.startTime) / 1000);
+    session.status = 'completed';
+
+    await session.save();
+
+    res.json({
+      success: true,
+      message: 'Quiz submitted successfully',
+      sessionId: session._id
+    });
+  } catch (error) {
+    console.error('Submit quiz error:', error);
+    res.status(500).json({ error: 'Server error submitting quiz' });
+  }
+});
+
 export default router;
 

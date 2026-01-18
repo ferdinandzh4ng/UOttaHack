@@ -4,6 +4,7 @@ This service processes video frames and returns vital signs metrics.
 """
 
 import os
+import math
 import sys
 import base64
 import cv2
@@ -77,6 +78,12 @@ class VitalsSession:
         self.baseline_breathing_rate = None
         self.frame_count = 0
         
+        # Eye tracking metrics
+        self.gaze_directions = deque(maxlen=100)
+        self.blink_rates = deque(maxlen=100)
+        self.eye_movement_stabilities = deque(maxlen=100)
+        self.focus_durations = deque(maxlen=100)
+        
         # Initialize custom metrics processor for fallback
         self.custom_processor = None
         if CUSTOM_METRICS_AVAILABLE and CustomMetricsProcessor:
@@ -87,8 +94,18 @@ class VitalsSession:
                 print(f"⚠️ [SESSION] Failed to initialize custom metrics processor: {e}")
                 self.custom_processor = None
         
-    def add_metrics(self, heart_rate, breathing_rate):
-        """Add new metrics reading"""
+    def add_metrics(self, heart_rate, breathing_rate, gaze_direction='unknown', blink_rate=None, eye_movement_stability=0.0, focus_duration=0.0):
+        """
+        Add new metrics reading with eye tracking data.
+        
+        Args:
+            heart_rate: Heart rate in BPM
+            breathing_rate: Breathing rate in BPM
+            gaze_direction: Direction of gaze ('screen', 'away', 'unknown')
+            blink_rate: Blinks per minute
+            eye_movement_stability: Stability of eye movements (0-1)
+            focus_duration: Duration of focus on screen (seconds)
+        """
         if heart_rate is not None:
             self.heart_rates.append(heart_rate)
             if self.baseline_heart_rate is None and len(self.heart_rates) >= 5:
@@ -100,10 +117,20 @@ class VitalsSession:
             if self.baseline_breathing_rate is None and len(self.breathing_rates) >= 5:
                 self.baseline_breathing_rate = np.mean(list(self.breathing_rates)[:5])
         
-        # Calculate derived metrics
-        focus_score = self._calculate_focus_score(heart_rate, breathing_rate)
-        engagement_score = self._calculate_engagement_score(heart_rate, breathing_rate)
-        thinking_intensity = self._calculate_thinking_intensity(heart_rate, breathing_rate)
+        # Store eye tracking metrics
+        if gaze_direction != 'unknown':
+            self.gaze_directions.append(gaze_direction)
+        if blink_rate is not None:
+            self.blink_rates.append(blink_rate)
+        if eye_movement_stability > 0:
+            self.eye_movement_stabilities.append(eye_movement_stability)
+        if focus_duration > 0:
+            self.focus_durations.append(focus_duration)
+        
+        # Calculate derived metrics (now using eye tracking data)
+        focus_score = self._calculate_focus_score(heart_rate, breathing_rate, gaze_direction, eye_movement_stability, focus_duration)
+        engagement_score = self._calculate_engagement_score(heart_rate, breathing_rate, gaze_direction, blink_rate)
+        thinking_intensity = self._calculate_thinking_intensity(heart_rate, breathing_rate, gaze_direction, eye_movement_stability)
         
         metric = {
             'heart_rate': heart_rate,
@@ -111,6 +138,10 @@ class VitalsSession:
             'focus_score': focus_score,
             'engagement_score': engagement_score,
             'thinking_intensity': thinking_intensity,
+            'gaze_direction': gaze_direction,
+            'blink_rate': blink_rate,
+            'eye_movement_stability': eye_movement_stability,
+            'focus_duration': focus_duration,
             'timestamp': datetime.now().isoformat()
         }
         
@@ -119,115 +150,228 @@ class VitalsSession:
         
         return metric
     
-    def _calculate_focus_score(self, heart_rate, breathing_rate):
+    def _calculate_focus_score(self, heart_rate, breathing_rate, gaze_direction='unknown', eye_movement_stability=0.0, focus_duration=0.0):
         """
-        Calculate focus score based on:
-        - Constant eye focus (assumed from stable vitals)
-        - Stable breathing (low variance)
-        - Moderate heart rate
+        Calculate focus score using multiplicative factors.
+        Base score from vitals, then multiplied by eye tracking factors.
         """
         if heart_rate is None or breathing_rate is None:
             return 0
         
-        score = 0
+        # Calculate base score from vitals (0-100)
+        base_score = 100  # Start with neutral base
         
         # Heart rate in moderate range (60-100 BPM) indicates focus
-        if FOCUS_HEART_RATE_MIN <= heart_rate <= FOCUS_HEART_RATE_MAX:
-            score += 40
-        elif heart_rate < FOCUS_HEART_RATE_MIN:
-            score += 20  # Too low, might be drowsy
-        elif heart_rate > FOCUS_HEART_RATE_MAX:
-            score += 10  # Too high, might be stressed
+        base_score *= math.abs((FOCUS_HEART_RATE_MAX - heart_rate) - (heart_rate - FOCUS_HEART_RATE_MIN));
+        base_score = 100-base_score;
+        
+        base_score = min(100, base_score);
+        base_score = max(0, base_score);
+        
+        
+            
         
         # Stable breathing indicates focus
         if len(self.breathing_rates) >= 3 and np is not None:
             breathing_std = np.std(list(self.breathing_rates))
             if breathing_std < FOCUS_BREATHING_STABILITY_THRESHOLD:
-                score += 40
+                base_score *=0.8
             elif breathing_std < FOCUS_BREATHING_STABILITY_THRESHOLD * 2:
-                score += 20
+                base_score *=0.9
         else:
-            score += 20  # Not enough data yet
+            base_score *=0.95  # Not enough data yet
         
         # Heart rate stability
         if len(self.heart_rates) >= 3 and np is not None:
             heart_std = np.std(list(self.heart_rates))
             if heart_std < 5:  # Very stable
-                score += 20
+                base_score += 10
             elif heart_std < 10:
-                score += 10
+                base_score += 5
         
-        return min(100, score)
+        base_score = min(100, base_score)
+        
+        # Apply multiplicative factors from eye tracking
+        gaze_factor = 1.0
+        if gaze_direction == 'screen':
+            gaze_factor = 1.0  # No penalty for looking at screen
+        elif gaze_direction == 'away':
+            # Looking away significantly reduces focus
+            gaze_factor = 0.5  # 50% reduction
+        else:
+            # Unknown gaze direction - slight penalty
+            gaze_factor = 0.8  # 20% reduction
+        
+        # Eye movement stability factor
+        stability_factor = 1.0
+        if eye_movement_stability > 0.8:
+            stability_factor = 1.0  # Very stable, no penalty
+        elif eye_movement_stability > 0.6:
+            stability_factor = 0.95  # Slight penalty
+        elif eye_movement_stability > 0.4:
+            stability_factor = 0.85  # Moderate penalty
+        elif eye_movement_stability > 0.2:
+            stability_factor = 0.7  # Significant penalty
+        elif eye_movement_stability > 0:
+            stability_factor = 0.6  # Large penalty
+        else:
+            stability_factor = 0.5  # No eye tracking data, significant penalty
+        
+        # Focus duration factor (longer focus = higher multiplier)
+        duration_factor = 1.0
+        if focus_duration > 5.0:  # 5+ seconds of focus
+            duration_factor = 1.0  # No penalty
+        elif focus_duration > 2.0:  # 2+ seconds
+            duration_factor = 0.95
+        elif focus_duration > 0.5:  # 0.5+ seconds
+            duration_factor = 0.9
+        else:
+            duration_factor = 0.8  # Very short focus duration
+        
+        # Apply all factors multiplicatively
+        final_score = base_score * gaze_factor * stability_factor * duration_factor
+        
+        return min(100, max(0, int(final_score)))
     
-    def _calculate_engagement_score(self, heart_rate, breathing_rate):
+    def _calculate_engagement_score(self, heart_rate, breathing_rate, gaze_direction='unknown', blink_rate=None):
         """
-        Calculate engagement score based on:
-        - Moderate to slightly elevated heart rate (engaged but not stressed)
-        - Regular breathing pattern
+        Calculate engagement score using multiplicative factors.
+        Base score from vitals, then multiplied by eye tracking factors.
         """
         if heart_rate is None or breathing_rate is None:
             return 0
         
-        score = 0
+        # Calculate base score from vitals (0-100)
+        base_score = 50  # Start with neutral base
         
         # Engaged heart rate range (70-90 BPM)
         if 70 <= heart_rate <= 90:
-            score += 50
+            base_score += 30
         elif 60 <= heart_rate < 70 or 90 < heart_rate <= 100:
-            score += 30
+            base_score += 20
         else:
-            score += 10
+            base_score += 10
         
         # Regular breathing (12-18 BPM is normal)
         if 12 <= breathing_rate <= 18:
-            score += 50
+            base_score += 20
         elif 10 <= breathing_rate < 12 or 18 < breathing_rate <= 20:
-            score += 30
+            base_score += 15
         else:
-            score += 20
+            base_score += 10
         
-        return min(100, score)
+        base_score = min(100, base_score)
+        
+        # Apply multiplicative factors from eye tracking
+        gaze_factor = 1.0
+        if gaze_direction == 'screen':
+            gaze_factor = 1.0  # No penalty for looking at screen
+        elif gaze_direction == 'away':
+            # Looking away reduces engagement
+            gaze_factor = 0.6  # 40% reduction
+        else:
+            # Unknown gaze direction - moderate penalty
+            gaze_factor = 0.85  # 15% reduction
+        
+        # Blink rate factor (normal blink rate indicates engagement)
+        # Normal blink rate is 15-20 blinks per minute
+        blink_factor = 1.0
+        if blink_rate is not None:
+            if 12 <= blink_rate <= 25:
+                blink_factor = 1.0  # Normal blink rate, no penalty
+            elif 8 <= blink_rate < 12 or 25 < blink_rate <= 30:
+                blink_factor = 0.9  # Slightly outside normal
+            elif blink_rate < 8:
+                blink_factor = 0.7  # Too low, might be drowsy
+            else:
+                blink_factor = 0.8  # Too high, might be stressed
+        else:
+            # No blink rate data - slight penalty
+            blink_factor = 0.9
+        
+        # Apply all factors multiplicatively
+        final_score = base_score * gaze_factor * blink_factor
+        
+        return min(100, max(0, int(final_score)))
     
-    def _calculate_thinking_intensity(self, heart_rate, breathing_rate):
+    def _calculate_thinking_intensity(self, heart_rate, breathing_rate, gaze_direction='unknown', eye_movement_stability=0.0):
         """
-        Calculate thinking intensity based on:
-        - Slower breathing (deep thinking)
-        - Extremely locked gaze (assumed from very stable vitals)
-        - Slight heart rate increase from baseline
+        Calculate thinking intensity using multiplicative factors.
+        Base score from vitals, then multiplied by eye tracking factors.
         """
         if heart_rate is None or breathing_rate is None:
             return 0
         
-        score = 0
+        # Calculate base score from vitals (0-100)
+        base_score = 50  # Start with neutral base
         
         # Slower breathing indicates deep thinking
         if breathing_rate < THINKING_BREATHING_SLOW_THRESHOLD:
-            score += 50
+            base_score += 30
         elif breathing_rate < THINKING_BREATHING_SLOW_THRESHOLD + 2:
-            score += 30
+            base_score += 20
         else:
-            score += 10
+            base_score += 10
         
         # Heart rate increase from baseline (but not too high)
         if self.baseline_heart_rate is not None:
             heart_increase = heart_rate - self.baseline_heart_rate
             if 5 <= heart_increase <= THINKING_HEART_RATE_INCREASE:
-                score += 30
+                base_score += 20
             elif heart_increase > THINKING_HEART_RATE_INCREASE:
-                score += 10  # Too high, might be stress
+                base_score += 10  # Too high, might be stress
         else:
-            score += 15  # Baseline not established yet
+            base_score += 10  # Baseline not established yet
         
         # Very stable vitals indicate locked gaze/focus
         if len(self.heart_rates) >= 5 and len(self.breathing_rates) >= 5 and np is not None:
             heart_std = np.std(list(self.heart_rates))
             breathing_std = np.std(list(self.breathing_rates))
             if heart_std < 3 and breathing_std < 1.5:
-                score += 20
+                base_score += 20
             elif heart_std < 5 and breathing_std < 2:
-                score += 10
+                base_score += 10
         
-        return min(100, score)
+        base_score = min(100, base_score)
+        
+        # Apply multiplicative factors from eye tracking
+        # Locked gaze on screen with high stability is key for thinking
+        gaze_stability_factor = 1.0
+        if gaze_direction == 'screen' and eye_movement_stability > 0.7:
+            # Perfect: looking at screen with high stability
+            gaze_stability_factor = 1.0  # No penalty
+        elif gaze_direction == 'screen' and eye_movement_stability > 0.5:
+            # Good: looking at screen with moderate stability
+            gaze_stability_factor = 0.9  # Slight penalty
+        elif gaze_direction == 'screen':
+            # Looking at screen but eyes moving around
+            gaze_stability_factor = 0.75  # Moderate penalty
+        elif gaze_direction == 'away':
+            # Looking away significantly reduces thinking intensity
+            gaze_stability_factor = 0.5  # Large penalty
+        else:
+            # Unknown gaze direction
+            gaze_stability_factor = 0.7  # Moderate penalty
+        
+        # Eye movement stability factor (more important for thinking)
+        stability_factor = 1.0
+        if eye_movement_stability > 0.8:
+            stability_factor = 1.0  # Very stable, no penalty
+        elif eye_movement_stability > 0.6:
+            stability_factor = 0.9  # Slight penalty
+        elif eye_movement_stability > 0.4:
+            stability_factor = 0.75  # Moderate penalty
+        elif eye_movement_stability > 0.2:
+            stability_factor = 0.6  # Significant penalty
+        elif eye_movement_stability > 0:
+            stability_factor = 0.5  # Large penalty
+        else:
+            stability_factor = 0.4  # No eye tracking data, very large penalty
+        
+        # Apply all factors multiplicatively
+        final_score = base_score * gaze_stability_factor * stability_factor
+        
+        return min(100, max(0, int(final_score)))
     
     def get_aggregated_metrics(self):
         """Get aggregated metrics for the session"""
@@ -488,10 +632,20 @@ def process_frame():
         source = vitals.get('source', 'unknown')
         print(f"📊 [FRAME] Using {source} metrics: HR={vitals.get('heart_rate', 'N/A')}, BR={vitals.get('breathing_rate', 'N/A')}, Gaze={vitals.get('gaze_direction', 'N/A')}")
         
-        # Add to session and calculate derived metrics
+        # Extract eye tracking metrics from custom vitals
+        gaze_direction = vitals.get('gaze_direction', 'unknown')
+        blink_rate = vitals.get('blink_rate')
+        eye_movement_stability = vitals.get('eye_movement_stability', 0.0)
+        focus_duration = vitals.get('focus_duration', 0.0)
+        
+        # Add to session and calculate derived metrics (now with eye tracking)
         metric = session.add_metrics(
             vitals.get('heart_rate'),
-            vitals.get('breathing_rate')
+            vitals.get('breathing_rate'),
+            gaze_direction=gaze_direction,
+            blink_rate=blink_rate,
+            eye_movement_stability=eye_movement_stability,
+            focus_duration=focus_duration
         )
         
         # Log metrics in real-time for testing

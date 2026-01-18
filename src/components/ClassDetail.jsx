@@ -156,9 +156,17 @@ function ClassDetail() {
   };
 
   const handleViewTask = async (task) => {
-    // Fetch full task data including variants
+    // For students, fetch their assigned variant; for educators, fetch all variants
     try {
-      const response = await fetch(`/api/tasks/${task.id}`);
+      let response;
+      if (user?.role === 'student') {
+        // Fetch student's assigned variant
+        response = await fetch(`/api/tasks/${task.id}/student/${user.id}`);
+      } else {
+        // Fetch full task data including variants for educators
+        response = await fetch(`/api/tasks/${task.id}`);
+      }
+      
       const data = await response.json();
       if (response.ok) {
         setSelectedTask(data);

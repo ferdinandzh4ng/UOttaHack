@@ -110,6 +110,21 @@ const studentTaskSessionSchema = new mongoose.Schema({
   },
   // Individual metric readings (for detailed analysis)
   metrics: [vitalMetricsSchema],
+  // Quiz answers (for Quiz tasks)
+  quizAnswers: [{
+    questionNumber: {
+      type: Number,
+      required: true
+    },
+    answer: {
+      type: String,
+      required: true
+    },
+    submittedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   // Aggregated metrics (averages for the session)
   aggregatedMetrics: {
     averageHeartRate: {

@@ -7,6 +7,9 @@ function TaskViewModal({ task, onClose }) {
   const [isCollectingMetrics, setIsCollectingMetrics] = useState(false);
   const [cameraError, setCameraError] = useState(null);
   const [metricsStatus, setMetricsStatus] = useState('idle'); // idle, starting, active, stopping
+  const [quizAnswers, setQuizAnswers] = useState({}); // Store student answers
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTaskComplete, setIsTaskComplete] = useState(false);
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -17,9 +20,20 @@ function TaskViewModal({ task, onClose }) {
   
   if (!task) return null;
 
-  // Determine which task data to display
-  const hasVariants = task.variants && task.variants.length > 0;
-  // Default to first variant if variants exist, otherwise use the task itself
+  // Get user role to determine if they can see variants
+  const [userRole, setUserRole] = useState(null);
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const userObj = JSON.parse(userData);
+      setUserRole(userObj.role);
+    }
+  }, []);
+
+  // For students: use the task directly (it's already their assigned variant)
+  // For educators: show variant selector if variants exist
+  const isStudent = userRole === 'student';
+  const hasVariants = !isStudent && task.variants && task.variants.length > 0;
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(hasVariants ? 0 : -1);
   
   const displayTask = hasVariants && selectedVariantIndex >= 0
@@ -29,6 +43,38 @@ function TaskViewModal({ task, onClose }) {
   const isLesson = displayTask.type === 'Lesson';
   const slides = isLesson ? (displayTask.lessonData?.slides || []) : [];
   const currentSlide = slides[currentSlideIndex];
+  const quizQuestions = !isLesson ? (displayTask.quizData?.questions || []) : [];
+
+  // Track if last slide has been viewed (for lessons)
+  const [lastSlideViewed, setLastSlideViewed] = useState(false);
+
+  // Check if task is complete
+  useEffect(() => {
+    if (isStudent) {
+      if (isLesson) {
+        // Lesson is complete when last slide has been viewed
+        setIsTaskComplete(slides.length > 0 && lastSlideViewed);
+      } else {
+        // Quiz is complete when all questions are answered and submitted
+        const allAnswered = quizQuestions.length > 0 && 
+          quizQuestions.every((q, idx) => {
+            const answerKey = idx;
+            return quizAnswers[answerKey] !== undefined && quizAnswers[answerKey] !== '';
+          });
+        setIsTaskComplete(allAnswered && isSubmitting === false); // Complete after submission
+      }
+    } else {
+      // Educators can always close
+      setIsTaskComplete(true);
+    }
+  }, [isStudent, isLesson, slides.length, lastSlideViewed, quizQuestions.length, quizAnswers, isSubmitting]);
+
+  // Track when last slide is viewed
+  useEffect(() => {
+    if (isLesson && isStudent && slides.length > 0 && currentSlideIndex === slides.length - 1) {
+      setLastSlideViewed(true);
+    }
+  }, [isLesson, isStudent, currentSlideIndex, slides.length]);
 
   // Debug logging
   console.log('[TaskViewModal] Display task:', displayTask);
@@ -102,6 +148,11 @@ function TaskViewModal({ task, onClose }) {
   const handleNext = () => {
     if (currentSlideIndex < slides.length - 1) {
       setCurrentSlideIndex(currentSlideIndex + 1);
+    } else {
+      // Reached last slide - task is complete
+      if (isStudent) {
+        setIsTaskComplete(true);
+      }
     }
   };
 
@@ -318,14 +369,85 @@ function TaskViewModal({ task, onClose }) {
   };
 
   const handleClose = () => {
+    // Prevent closing if task is not complete (for students)
+    if (isStudent && !isTaskComplete) {
+      if (isLesson) {
+        alert('Please view all slides before closing.');
+      } else {
+        alert('Please answer all questions and submit the quiz before closing.');
+      }
+      return;
+    }
     stopMetricsCollection();
     onClose();
+  };
+
+  const handleQuizAnswerChange = (questionIndex, value) => {
+    setQuizAnswers(prev => ({
+      ...prev,
+      [questionIndex]: value
+    }));
+  };
+
+  const handleQuizSubmit = async () => {
+    if (!userRef.current || userRef.current.role !== 'student') {
+      return;
+    }
+
+    // Check if all questions are answered
+    const allAnswered = quizQuestions.every((q, idx) => {
+      return quizAnswers[idx] !== undefined && quizAnswers[idx] !== '';
+    });
+
+    if (!allAnswered) {
+      alert('Please answer all questions before submitting.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Submit quiz answers
+      const response = await fetch('/api/tasks/submit-quiz', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          taskId: displayTask.id || displayTask._id,
+          studentId: userRef.current.id,
+          answers: quizQuestions.map((q, idx) => ({
+            questionNumber: q.questionNumber || idx + 1,
+            answer: quizAnswers[idx]
+          }))
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        alert('Quiz submitted successfully!');
+        setIsTaskComplete(true);
+      } else {
+        alert(`Error submitting quiz: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      alert('Error submitting quiz. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div 
       className="task-view-overlay" 
-      onClick={handleClose}
+      onClick={(e) => {
+        // Only allow closing if task is complete or user is educator
+        if (isStudent && !isTaskComplete) {
+          e.stopPropagation();
+          return;
+        }
+        handleClose();
+      }}
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
@@ -356,7 +478,8 @@ function TaskViewModal({ task, onClose }) {
                 {cameraError && `⚠️ ${cameraError}`}
               </div>
             )}
-            {hasVariants && (
+            {/* Only show variant selector for educators */}
+            {hasVariants && !isStudent && (
               <div className="variant-selector">
                 <label htmlFor="variant-select">Variant:</label>
                 <select
@@ -376,8 +499,22 @@ function TaskViewModal({ task, onClose }) {
                 </select>
               </div>
             )}
+            {/* Show group info for students */}
+            {isStudent && task.groupNumber && (
+              <div className="group-info" style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                Group {task.groupNumber}
+              </div>
+            )}
           </div>
-          <button className="close-btn" onClick={handleClose}>×</button>
+          <button 
+            className="close-btn" 
+            onClick={handleClose}
+            disabled={isStudent && !isTaskComplete}
+            style={isStudent && !isTaskComplete ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+            title={isStudent && !isTaskComplete ? 'Complete the task to close' : 'Close'}
+          >
+            ×
+          </button>
         </div>
 
         {/* Show AI models info */}
@@ -547,28 +684,136 @@ function TaskViewModal({ task, onClose }) {
                     <p className="question-text">{question.question}</p>
                     <p className="question-type">Type: {question.type}</p>
                     
+                    {/* Show options for MCQ and True/False */}
                     {question.options && question.options.length > 0 && (
                       <div className="question-options">
                         <h4>Options:</h4>
-                        <ul>
-                          {question.options.map((option, optIndex) => (
-                            <li key={optIndex}>{option}</li>
-                          ))}
-                        </ul>
+                        {isStudent ? (
+                          // For students: show as selectable options
+                          <div className="answer-input">
+                            {question.type === 'MCQ' ? (
+                              <select
+                                value={quizAnswers[index] || ''}
+                                onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
+                                style={{ width: '100%', padding: '8px', fontSize: '14px', marginTop: '8px' }}
+                              >
+                                <option value="">Select an answer...</option>
+                                {question.options.map((option, optIndex) => (
+                                  <option key={optIndex} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            ) : question.type === 'True/False' ? (
+                              <div style={{ marginTop: '8px' }}>
+                                <label style={{ marginRight: '16px', cursor: 'pointer' }}>
+                                  <input
+                                    type="radio"
+                                    name={`question-${index}`}
+                                    value="True"
+                                    checked={quizAnswers[index] === 'True'}
+                                    onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
+                                    style={{ marginRight: '4px' }}
+                                  />
+                                  True
+                                </label>
+                                <label style={{ cursor: 'pointer' }}>
+                                  <input
+                                    type="radio"
+                                    name={`question-${index}`}
+                                    value="False"
+                                    checked={quizAnswers[index] === 'False'}
+                                    onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
+                                    style={{ marginRight: '4px' }}
+                                  />
+                                  False
+                                </label>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          // For educators: show as list
+                          <ul>
+                            {question.options.map((option, optIndex) => (
+                              <li key={optIndex}>{option}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     )}
                     
-                    <div className="question-answer">
-                      <strong>Correct Answer:</strong> {question.correctAnswer}
-                    </div>
+                    {/* For Short Answer questions, show text input */}
+                    {question.type === 'Short Answer' && isStudent && (
+                      <div className="answer-input" style={{ marginTop: '12px' }}>
+                        <label>
+                          <strong>Your Answer:</strong>
+                          <textarea
+                            value={quizAnswers[index] || ''}
+                            onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
+                            placeholder="Type your answer here..."
+                            style={{ 
+                              width: '100%', 
+                              minHeight: '80px', 
+                              padding: '8px', 
+                              fontSize: '14px',
+                              marginTop: '8px',
+                              fontFamily: 'inherit',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px'
+                            }}
+                          />
+                        </label>
+                      </div>
+                    )}
                     
-                    {question.explanation && (
-                      <div className="question-explanation">
-                        <strong>Explanation:</strong> {question.explanation}
+                    {/* Show correct answer and explanation only for educators */}
+                    {!isStudent && (
+                      <>
+                        <div className="question-answer" style={{ marginTop: '12px', padding: '8px', background: '#e8f5e9', borderRadius: '4px' }}>
+                          <strong>Correct Answer:</strong> {question.correctAnswer}
+                        </div>
+                        
+                        {question.explanation && (
+                          <div className="question-explanation" style={{ marginTop: '8px', padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
+                            <strong>Explanation:</strong> {question.explanation}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Show student's answer if submitted */}
+                    {isStudent && quizAnswers[index] && (
+                      <div style={{ marginTop: '12px', padding: '8px', background: '#e3f2fd', borderRadius: '4px' }}>
+                        <strong>Your Answer:</strong> {quizAnswers[index]}
                       </div>
                     )}
                   </div>
                 ))}
+                
+                {/* Submit button for students */}
+                {isStudent && (
+                  <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                    <button
+                      onClick={handleQuizSubmit}
+                      disabled={isSubmitting || !quizQuestions.every((q, idx) => quizAnswers[idx] !== undefined && quizAnswers[idx] !== '')}
+                      style={{
+                        padding: '12px 24px',
+                        fontSize: '16px',
+                        backgroundColor: isSubmitting ? '#ccc' : '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+                    </button>
+                    {isTaskComplete && (
+                      <p style={{ marginTop: '12px', color: '#4CAF50', fontWeight: 'bold' }}>
+                        ✓ Quiz submitted successfully!
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="no-questions">
