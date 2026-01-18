@@ -14,65 +14,73 @@ class GroupingService {
   getAICombos() {
     return {
       // For Lesson tasks (script + image)
-      // Models are from Backboard.io Model Library: https://backboard.io
-      // For Google image generation, we use gemini-2.5-flash-image
-      // First two combos ensure we have at least one Gemini and one GPT variant
+      // Models are from OpenRouter API
+      // Gemini available for script generation, OpenAI for images
       lesson: [
         {
-          scriptModel: { provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
-          imageModel: { provider: 'google', model: 'google/gemini-2.5-flash-image', name: 'Google Gemini 2.5 Flash Image' }
-        },
-        {
-          scriptModel: { provider: 'openai', model: 'gpt-4o', name: 'OpenAI GPT-4o' },
+          scriptModel: { provider: 'google', model: 'google/gemini-2.5-flash-lite', name: 'Google Gemini 2.5 Flash Lite' },
           imageModel: { provider: 'openai', model: 'openai/gpt-5-image-mini', name: 'OpenAI GPT-5 Image Mini' }
         },
         {
-          scriptModel: { provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
-          imageModel: { provider: 'google', model: 'google/gemini-2.5-flash-image', name: 'Google Gemini 2.5 Flash Image' }
+          scriptModel: { provider: 'google', model: 'google/gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
+          imageModel: { provider: 'openai', model: 'openai/gpt-5-image-mini', name: 'OpenAI GPT-5 Image Mini' }
         },
         {
-          scriptModel: { provider: 'openai', model: 'gpt-5', name: 'OpenAI GPT-5' },
+          scriptModel: { provider: 'anthropic', model: 'anthropic/claude-3-5-sonnet-20241022', name: 'Anthropic Claude 3.5 Sonnet' },
+          imageModel: { provider: 'openai', model: 'openai/gpt-5-image-mini', name: 'OpenAI GPT-5 Image Mini' }
+        },
+        {
+          scriptModel: { provider: 'openai', model: 'openai/gpt-4o', name: 'OpenAI GPT-4o' },
+          imageModel: { provider: 'openai', model: 'openai/gpt-5-image-mini', name: 'OpenAI GPT-5 Image Mini' }
+        },
+        {
+          scriptModel: { provider: 'google', model: 'google/gemini-2.5-pro', name: 'Google Gemini 2.5 Pro' },
           imageModel: { provider: 'openai', model: 'openai/gpt-5-image', name: 'OpenAI GPT-5 Image' }
         },
         {
-          scriptModel: { provider: 'openai', model: 'gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
+          scriptModel: { provider: 'openai', model: 'openai/gpt-5', name: 'OpenAI GPT-5' },
           imageModel: { provider: 'openai', model: 'openai/gpt-5-image', name: 'OpenAI GPT-5 Image' }
         },
         {
-          scriptModel: { provider: 'anthropic', model: 'claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' },
+          scriptModel: { provider: 'openai', model: 'openai/gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
+          imageModel: { provider: 'openai', model: 'openai/gpt-5-image', name: 'OpenAI GPT-5 Image' }
+        },
+        {
+          scriptModel: { provider: 'anthropic', model: 'anthropic/claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' },
           imageModel: { provider: 'openai', model: 'openai/gpt-5-image-mini', name: 'OpenAI GPT-5 Image Mini' }
         }
       ],
       // For Quiz tasks (quiz prompt + quiz questions)
-      // Models are from Backboard.io Model Library: https://backboard.io
+      // Models are from OpenRouter API
+      // Removed Google/Gemini models - using Claude and GPT only
       quiz: [
         {
-          quizPromptModel: { provider: 'google', model: 'gemini-2.5-flash-lite', name: 'Google Gemini 2.5 Flash Lite' },
-          quizQuestionsModel: { provider: 'google', model: 'gemini-2.5-flash-lite', name: 'Google Gemini 2.5 Flash Lite' }
+          quizPromptModel: { provider: 'anthropic', model: 'anthropic/claude-3-5-sonnet-20241022', name: 'Anthropic Claude 3.5 Sonnet' },
+          quizQuestionsModel: { provider: 'anthropic', model: 'anthropic/claude-3-5-sonnet-20241022', name: 'Anthropic Claude 3.5 Sonnet' }
         },
         {
-          quizPromptModel: { provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
-          quizQuestionsModel: { provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' }
+          quizPromptModel: { provider: 'anthropic', model: 'anthropic/claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' },
+          quizQuestionsModel: { provider: 'anthropic', model: 'anthropic/claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' }
         },
         {
-          quizPromptModel: { provider: 'google', model: 'gemini-2.5-pro', name: 'Google Gemini 2.5 Pro' },
-          quizQuestionsModel: { provider: 'google', model: 'gemini-2.5-pro', name: 'Google Gemini 2.5 Pro' }
+          quizPromptModel: { provider: 'openai', model: 'openai/gpt-4o', name: 'OpenAI GPT-4o' },
+          quizQuestionsModel: { provider: 'openai', model: 'openai/gpt-4o', name: 'OpenAI GPT-4o' }
         },
         {
-          quizPromptModel: { provider: 'openai', model: 'gpt-4o', name: 'OpenAI GPT-4o' },
-          quizQuestionsModel: { provider: 'openai', model: 'gpt-4o', name: 'OpenAI GPT-4o' }
+          quizPromptModel: { provider: 'openai', model: 'openai/gpt-5', name: 'OpenAI GPT-5' },
+          quizQuestionsModel: { provider: 'openai', model: 'openai/gpt-5', name: 'OpenAI GPT-5' }
         },
         {
-          quizPromptModel: { provider: 'openai', model: 'gpt-5', name: 'OpenAI GPT-5' },
-          quizQuestionsModel: { provider: 'openai', model: 'gpt-5', name: 'OpenAI GPT-5' }
+          quizPromptModel: { provider: 'openai', model: 'openai/gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
+          quizQuestionsModel: { provider: 'openai', model: 'openai/gpt-5-mini', name: 'OpenAI GPT-5 Mini' }
         },
         {
-          quizPromptModel: { provider: 'openai', model: 'gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
-          quizQuestionsModel: { provider: 'openai', model: 'gpt-5-mini', name: 'OpenAI GPT-5 Mini' }
+          quizPromptModel: { provider: 'anthropic', model: 'anthropic/claude-3-5-sonnet-20241022', name: 'Anthropic Claude 3.5 Sonnet' },
+          quizQuestionsModel: { provider: 'openai', model: 'openai/gpt-4o', name: 'OpenAI GPT-4o' }
         },
         {
-          quizPromptModel: { provider: 'anthropic', model: 'claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' },
-          quizQuestionsModel: { provider: 'anthropic', model: 'claude-3-7-sonnet-20250219', name: 'Anthropic Claude 3.7 Sonnet' }
+          quizPromptModel: { provider: 'openai', model: 'openai/gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
+          quizQuestionsModel: { provider: 'anthropic', model: 'anthropic/claude-3-5-sonnet-20241022', name: 'Anthropic Claude 3.5 Sonnet' }
         }
       ]
     };

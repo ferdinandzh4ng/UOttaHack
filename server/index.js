@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as Sentry from '@sentry/node';
 import userRoutes from './routes/userRoutes.js';
 import classRoutes from './routes/classRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
@@ -16,8 +17,38 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
+// Initialize Sentry
+const SENTRY_DSN = process.env.SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 0.25, // 25% of successful transactions for free tier
+    beforeSend(event, hint) {
+      // Sample 100% of errors, reduce successful transactions
+      if (event.level === 'error' || event.level === 'fatal') {
+        return event;
+      }
+      return event;
+    },
+    integrations: [
+      new Sentry.Integrations.Http({ tracing: true }),
+      new Sentry.Integrations.Express({ app: express() }),
+    ],
+  });
+  console.log('✅ Sentry initialized');
+} else {
+  console.warn('⚠️  SENTRY_DSN not set - Sentry monitoring disabled');
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Sentry request handler must be first
+if (SENTRY_DSN) {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+}
 
 // Middleware
 app.use(cors());
@@ -95,6 +126,10 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/video', videoRoutes);
 app.use('/api/metrics', metricRoutes);
 
+// Import analytics routes
+import analyticsRoutes from './routes/analyticsRoutes.js';
+app.use('/api/analytics', analyticsRoutes);
+
 // API endpoint to get routing configuration
 app.get('/api/ai-router/config', async (req, res) => {
   try {
@@ -123,7 +158,14 @@ app.post('/api/ai-router/config', async (req, res) => {
   }
 });
 
+// Sentry error handler must be after routes
+if (SENTRY_DSN) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+export { Sentry };
 
