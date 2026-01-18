@@ -4,24 +4,27 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 2rem;
   box-sizing: border-box;
+  backdrop-filter: blur(4px);
 }
 
 .modal-content {
-  background: white;
-  border-radius: 20px;
-  padding: 2rem;
-  max-width: 500px;
+  background: var(--base-white);
+  border-radius: 12px;
+  padding: 2.5rem;
+  max-width: 520px;
   width: 100%;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
   max-height: 90vh;
   overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  animation: fadeIn 0.5s ease-out;
 }
 
 .modal-header {
@@ -32,29 +35,33 @@
 }
 
 .modal-header h2 {
-  color: #333;
-  font-size: 2rem;
+  color: var(--primary-violet);
+  font-size: 1.75rem;
   margin: 0;
+  font-weight: 700;
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: #666;
+  background: var(--base-gray-100);
+  border: 1px solid var(--border-subtle);
+  font-size: 1.5rem;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: background 0.2s;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-weight: 400;
 }
 
 .close-btn:hover {
-  background: #f0f0f0;
+  background: var(--base-gray-200);
+  color: var(--text-primary);
+  transform: rotate(90deg);
 }
 
 .modal-form {
@@ -70,78 +77,108 @@
 }
 
 .form-group label {
-  color: #1f2937;
-  font-weight: 700;
-  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
-.form-group input {
-  padding: 0.75rem 1rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 10px;
+.form-group input,
+.form-group select {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
   font-size: 1rem;
-  transition: border-color 0.3s;
-  background: white;
-  color: #1f2937;
+  transition: all 0.2s ease;
+  background: var(--base-white);
+  font-family: inherit;
+  color: var(--text-primary);
 }
 
 .form-group input::placeholder {
-  color: #9ca3af;
-  opacity: 1;
+  color: var(--base-gray-400);
 }
 
-.form-group input:focus {
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
-  border-color: #667eea;
-  background: white;
+  border-color: var(--primary-violet);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 
 .error-message {
-  background-color: #fee;
-  color: #c33;
-  padding: 0.75rem;
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  padding: 0.875rem;
   border-radius: 8px;
-  text-align: center;
+  border-left: 3px solid #dc2626;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .modal-actions {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
 .cancel-btn {
-  background: #f5f5f5;
-  color: #333;
-  border: none;
+  background: var(--base-gray-100);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
   padding: 0.75rem 1.5rem;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
 .cancel-btn:hover {
-  background: #e0e0e0;
+  background: var(--base-gray-200);
+  border-color: var(--base-gray-300);
 }
 
 .submit-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--primary-violet);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.2s ease;
 }
 
 .submit-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  background: var(--violet-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    padding: 2rem 1.5rem;
+  }
+
+  .modal-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .cancel-btn,
+  .submit-btn {
+    width: 100%;
+  }
+}
+
 
 .submit-btn:disabled {
   opacity: 0.6;

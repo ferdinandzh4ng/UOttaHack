@@ -43,4 +43,7 @@ sam_service/.env
 *.njsproj
 *.sln
 *.sw?
+<<<<<<< HEAD
 sam_service/SmartSpectra/
+=======
+>>>>>>> origin/Test

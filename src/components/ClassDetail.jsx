@@ -365,6 +365,3 @@ function ClassDetail() {
     </div>
   );
 }
-
-export default ClassDetail;
-

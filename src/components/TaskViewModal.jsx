@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useState, useEffect, useRef } from 'react';
 import './TaskViewModal.css';
 
@@ -34,6 +35,19 @@ function TaskViewModal({ task, onClose }) {
   // For educators: show variant selector if variants exist
   const isStudent = userRole === 'student';
   const hasVariants = !isStudent && task.variants && task.variants.length > 0;
+=======
+import { useState } from 'react';
+import './TaskViewModal.css';
+
+function TaskViewModal({ task, onClose, userRole = 'student' }) {
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  
+  if (!task) return null;
+
+  // Determine which task data to display
+  const hasVariants = task.variants && task.variants.length > 0;
+  // Default to first variant if variants exist, otherwise use the task itself
+>>>>>>> origin/Test
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(hasVariants ? 0 : -1);
   
   const displayTask = hasVariants && selectedVariantIndex >= 0
@@ -43,6 +57,7 @@ function TaskViewModal({ task, onClose }) {
   const isLesson = displayTask.type === 'Lesson';
   const slides = isLesson ? (displayTask.lessonData?.slides || []) : [];
   const currentSlide = slides[currentSlideIndex];
+<<<<<<< HEAD
   const quizQuestions = !isLesson ? (displayTask.quizData?.questions || []) : [];
 
   // Track if last slide has been viewed (for lessons)
@@ -75,6 +90,8 @@ function TaskViewModal({ task, onClose }) {
       setLastSlideViewed(true);
     }
   }, [isLesson, isStudent, currentSlideIndex, slides.length]);
+=======
+>>>>>>> origin/Test
 
   // Debug logging
   console.log('[TaskViewModal] Display task:', displayTask);
@@ -117,6 +134,7 @@ function TaskViewModal({ task, onClose }) {
     }
   };
 
+<<<<<<< HEAD
   // Pause and reset audio when slide changes
   useEffect(() => {
     if (audioRef.current) {
@@ -139,6 +157,8 @@ function TaskViewModal({ task, onClose }) {
     }
   }, [currentSlideIndex, currentSlide?.speechUrl]);
 
+=======
+>>>>>>> origin/Test
   const handlePrevious = () => {
     if (currentSlideIndex > 0) {
       setCurrentSlideIndex(currentSlideIndex - 1);
@@ -148,17 +168,21 @@ function TaskViewModal({ task, onClose }) {
   const handleNext = () => {
     if (currentSlideIndex < slides.length - 1) {
       setCurrentSlideIndex(currentSlideIndex + 1);
+<<<<<<< HEAD
     } else {
       // Reached last slide - task is complete
       if (isStudent) {
         setIsTaskComplete(true);
       }
+=======
+>>>>>>> origin/Test
     }
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowLeft') handlePrevious();
     if (e.key === 'ArrowRight') handleNext();
+<<<<<<< HEAD
     if (e.key === 'Escape') {
       handleClose();
     }
@@ -435,11 +459,15 @@ function TaskViewModal({ task, onClose }) {
     } finally {
       setIsSubmitting(false);
     }
+=======
+    if (e.key === 'Escape') onClose();
+>>>>>>> origin/Test
   };
 
   return (
     <div 
       className="task-view-overlay" 
+<<<<<<< HEAD
       onClick={(e) => {
         // Only allow closing if task is complete or user is educator
         if (isStudent && !isTaskComplete) {
@@ -448,10 +476,14 @@ function TaskViewModal({ task, onClose }) {
         }
         handleClose();
       }}
+=======
+      onClick={onClose}
+>>>>>>> origin/Test
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       <div className="task-view-content" onClick={(e) => e.stopPropagation()}>
+<<<<<<< HEAD
         {/* Hidden video element for camera capture */}
         <video
           ref={videoRef}
@@ -480,6 +512,12 @@ function TaskViewModal({ task, onClose }) {
             )}
             {/* Only show variant selector for educators */}
             {hasVariants && !isStudent && (
+=======
+        <div className="task-view-header">
+          <div className="task-view-title-section">
+            <h2>{task.topic}</h2>
+            {hasVariants && (
+>>>>>>> origin/Test
               <div className="variant-selector">
                 <label htmlFor="variant-select">Variant:</label>
                 <select
@@ -499,6 +537,7 @@ function TaskViewModal({ task, onClose }) {
                 </select>
               </div>
             )}
+<<<<<<< HEAD
             {/* Show group info for students */}
             {isStudent && task.groupNumber && (
               <div className="group-info" style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
@@ -515,6 +554,10 @@ function TaskViewModal({ task, onClose }) {
           >
             ×
           </button>
+=======
+          </div>
+          <button className="close-btn" onClick={onClose}>×</button>
+>>>>>>> origin/Test
         </div>
 
         {/* Show AI models info */}
@@ -568,17 +611,23 @@ function TaskViewModal({ task, onClose }) {
                         <p style={{ fontSize: '12px', marginTop: '4px' }}>imageUrl: {currentSlide?.imageUrl || 'undefined'}</p>
                       </div>
                     )}
+<<<<<<< HEAD
                     
                     <div className="slide-script">
                       <h3>Script</h3>
                       <p>{currentSlide?.script || 'No script available'}</p>
                     </div>
+=======
+>>>>>>> origin/Test
 
                     {currentSlide?.speechUrl && currentSlide.speechUrl.trim() !== '' ? (
                       <div className="slide-speech">
                         <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: '600', color: '#333' }}>Audio</h3>
                         <audio 
+<<<<<<< HEAD
                           ref={audioRef}
+=======
+>>>>>>> origin/Test
                           controls 
                           src={currentSlide.speechUrl}
                           crossOrigin="anonymous"
@@ -608,6 +657,7 @@ function TaskViewModal({ task, onClose }) {
                           onLoadedMetadata={(e) => {
                             console.log('[Audio] Metadata loaded, duration:', e.target.duration);
                           }}
+<<<<<<< HEAD
                           onPlay={(e) => {
                             // Handle play() promise to avoid interruption warnings
                             const playPromise = e.target.play();
@@ -620,6 +670,8 @@ function TaskViewModal({ task, onClose }) {
                               });
                             }
                           }}
+=======
+>>>>>>> origin/Test
                         >
                           Your browser does not support the audio element.
                         </audio>
@@ -684,6 +736,7 @@ function TaskViewModal({ task, onClose }) {
                     <p className="question-text">{question.question}</p>
                     <p className="question-type">Type: {question.type}</p>
                     
+<<<<<<< HEAD
                     {/* Show answer input for students */}
                     {isStudent && (
                       <div className="answer-input" style={{ marginTop: '12px' }}>
@@ -750,6 +803,10 @@ function TaskViewModal({ task, onClose }) {
                     {/* Show options list for educators */}
                     {!isStudent && question.options && question.options.length > 0 && (
                       <div className="question-options" style={{ marginTop: '12px' }}>
+=======
+                    {question.options && question.options.length > 0 && (
+                      <div className="question-options">
+>>>>>>> origin/Test
                         <h4>Options:</h4>
                         <ul>
                           {question.options.map((option, optIndex) => (
@@ -759,6 +816,7 @@ function TaskViewModal({ task, onClose }) {
                       </div>
                     )}
                     
+<<<<<<< HEAD
                     {/* For Short Answer questions, show text input */}
                     {question.type === 'Short Answer' && isStudent && (
                       <div className="answer-input" style={{ marginTop: '12px' }}>
@@ -802,10 +860,20 @@ function TaskViewModal({ task, onClose }) {
                     {isStudent && quizAnswers[index] && (
                       <div style={{ marginTop: '12px', padding: '8px', background: '#e3f2fd', borderRadius: '4px' }}>
                         <strong>Your Answer:</strong> {quizAnswers[index]}
+=======
+                    <div className="question-answer">
+                      <strong>Correct Answer:</strong> {question.correctAnswer}
+                    </div>
+                    
+                    {question.explanation && (
+                      <div className="question-explanation">
+                        <strong>Explanation:</strong> {question.explanation}
+>>>>>>> origin/Test
                       </div>
                     )}
                   </div>
                 ))}
+<<<<<<< HEAD
                 
                 {/* Submit button for students */}
                 {isStudent && (
@@ -833,6 +901,8 @@ function TaskViewModal({ task, onClose }) {
                     )}
                   </div>
                 )}
+=======
+>>>>>>> origin/Test
               </div>
             ) : (
               <div className="no-questions">
