@@ -684,59 +684,78 @@ function TaskViewModal({ task, onClose }) {
                     <p className="question-text">{question.question}</p>
                     <p className="question-type">Type: {question.type}</p>
                     
-                    {/* Show options for MCQ and True/False */}
-                    {question.options && question.options.length > 0 && (
-                      <div className="question-options">
-                        <h4>Options:</h4>
-                        {isStudent ? (
-                          // For students: show as selectable options
-                          <div className="answer-input">
-                            {question.type === 'MCQ' ? (
+                    {/* Show answer input for students */}
+                    {isStudent && (
+                      <div className="answer-input" style={{ marginTop: '12px' }}>
+                        {question.type === 'MCQ' ? (
+                          question.options && question.options.length > 0 ? (
+                            <div>
+                              <label><strong>Select your answer:</strong></label>
                               <select
                                 value={quizAnswers[index] || ''}
                                 onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
-                                style={{ width: '100%', padding: '8px', fontSize: '14px', marginTop: '8px' }}
+                                style={{ 
+                                  width: '100%', 
+                                  padding: '10px', 
+                                  fontSize: '14px', 
+                                  marginTop: '8px',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer'
+                                }}
                               >
-                                <option value="">Select an answer...</option>
+                                <option value="">-- Select an answer --</option>
                                 {question.options.map((option, optIndex) => (
                                   <option key={optIndex} value={option}>{option}</option>
                                 ))}
                               </select>
-                            ) : question.type === 'True/False' ? (
-                              <div style={{ marginTop: '8px' }}>
-                                <label style={{ marginRight: '16px', cursor: 'pointer' }}>
-                                  <input
-                                    type="radio"
-                                    name={`question-${index}`}
-                                    value="True"
-                                    checked={quizAnswers[index] === 'True'}
-                                    onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
-                                    style={{ marginRight: '4px' }}
-                                  />
-                                  True
-                                </label>
-                                <label style={{ cursor: 'pointer' }}>
-                                  <input
-                                    type="radio"
-                                    name={`question-${index}`}
-                                    value="False"
-                                    checked={quizAnswers[index] === 'False'}
-                                    onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
-                                    style={{ marginRight: '4px' }}
-                                  />
-                                  False
-                                </label>
-                              </div>
-                            ) : null}
+                            </div>
+                          ) : (
+                            <div style={{ padding: '8px', background: '#fff3cd', borderRadius: '4px', color: '#856404' }}>
+                              <p>⚠️ No options available for this question. Please contact your teacher.</p>
+                            </div>
+                          )
+                        ) : question.type === 'True/False' ? (
+                          <div>
+                            <label><strong>Select your answer:</strong></label>
+                            <div style={{ marginTop: '8px', display: 'flex', gap: '20px' }}>
+                              <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '16px' }}>
+                                <input
+                                  type="radio"
+                                  name={`question-${index}`}
+                                  value="True"
+                                  checked={quizAnswers[index] === 'True'}
+                                  onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
+                                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                                True
+                              </label>
+                              <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '16px' }}>
+                                <input
+                                  type="radio"
+                                  name={`question-${index}`}
+                                  value="False"
+                                  checked={quizAnswers[index] === 'False'}
+                                  onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
+                                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                                False
+                              </label>
+                            </div>
                           </div>
-                        ) : (
-                          // For educators: show as list
-                          <ul>
-                            {question.options.map((option, optIndex) => (
-                              <li key={optIndex}>{option}</li>
-                            ))}
-                          </ul>
-                        )}
+                        ) : null}
+                      </div>
+                    )}
+                    
+                    {/* Show options list for educators */}
+                    {!isStudent && question.options && question.options.length > 0 && (
+                      <div className="question-options" style={{ marginTop: '12px' }}>
+                        <h4>Options:</h4>
+                        <ul>
+                          {question.options.map((option, optIndex) => (
+                            <li key={optIndex}>{option}</li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                     

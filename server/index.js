@@ -9,12 +9,14 @@ import classRoutes from './routes/classRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
 import videoRoutes from './routes/videoRoutes.js';
 import metricRoutes from './routes/metricRoutes.js';
+import insightsRoutes from './routes/insightsRoutes.js';
 import aiRouterService from './services/aiRouterService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
+// Load .env from project root (one level up from server directory)
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -94,6 +96,7 @@ app.use('/api/classes', classRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/video', videoRoutes);
 app.use('/api/metrics', metricRoutes);
+app.use('/api/insights', insightsRoutes);
 
 // API endpoint to get routing configuration
 app.get('/api/ai-router/config', async (req, res) => {

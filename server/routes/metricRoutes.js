@@ -4,6 +4,11 @@ import Task from '../models/Task.js';
 import Class from '../models/Class.js';
 import vitalsService from '../services/vitalsService.js';
 import modelRecommendationService from '../services/modelRecommendationService.js';
+import feedbackNormalizerService from '../services/feedbackNormalizerService.js';
+import surveyMonkeyService from '../services/surveyMonkeyService.js';
+import agentSelectionService from '../services/agentSelectionService.js';
+import feedbackAlertService from '../services/feedbackAlertService.js';
+import SessionFeedback from '../models/SessionFeedback.js';
 
 const router = express.Router();
 
@@ -20,9 +25,28 @@ router.post('/session/start', async (req, res) => {
     }
 
     // Get task and class info
-    const task = await Task.findById(taskId).populate('class');
+    let task = await Task.findById(taskId).populate('class');
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // If this is a parent task (no parentTask field), find the student's variant task
+    // Variant tasks have the aiModels populated
+    if (!task.parentTask) {
+      const StudentGroup = (await import('../models/StudentGroup.js')).default;
+      const group = await StudentGroup.findOne({
+        task: taskId,
+        students: studentId
+      });
+      
+      if (group && group.taskVariantId) {
+        const variantTask = await Task.findById(group.taskVariantId);
+        if (variantTask && variantTask.aiModels) {
+          // Use variant task for aiModels, but keep parent task for other info
+          task = { ...task.toObject(), aiModels: variantTask.aiModels };
+          console.log(`📊 [METRICS] Using variant task ${group.taskVariantId} aiModels for session`);
+        }
+      }
     }
 
     const classData = await Class.findById(task.class);
@@ -197,13 +221,64 @@ router.post('/session/stop', async (req, res) => {
     }
 
     // Get session
-    const session = await StudentTaskSession.findById(sessionId);
+    let session = await StudentTaskSession.findById(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
 
     if (session.status !== 'active') {
       return res.status(400).json({ error: 'Session is not active' });
+    }
+
+    // Get AI models from the student's group and variant task
+    // Every student is assigned to a group, and each group has a variant task with specific AI models
+    const StudentGroup = (await import('../models/StudentGroup.js')).default;
+    const task = await Task.findById(session.task);
+    
+    if (task) {
+      let variantTask = null;
+      
+      if (task.parentTask) {
+        // This is already a variant task, use it directly
+        variantTask = task;
+      } else {
+        // This is a parent task, find the student's group and get the variant task
+        const group = await StudentGroup.findOne({
+          task: session.task,
+          students: session.student
+        });
+        
+        if (group && group.taskVariantId) {
+          variantTask = await Task.findById(group.taskVariantId);
+          if (variantTask) {
+            console.log(`📊 [METRICS] Found variant task ${variantTask._id} for group ${group.groupNumber}`);
+          }
+        } else if (group) {
+          console.warn(`⚠️ [METRICS] Group ${group.groupNumber} found but no variant task assigned yet`);
+        } else {
+          console.warn(`⚠️ [METRICS] No group found for student ${session.student} and task ${session.task}`);
+        }
+      }
+      
+      // Update session with variant task's aiModels (includes full model names)
+      if (variantTask && variantTask.aiModels) {
+        session.aiModels = variantTask.aiModels;
+        await session.save();
+        console.log(`✅ [METRICS] Updated session with AI models:`, {
+          taskType: session.taskType,
+          scriptModel: variantTask.aiModels.scriptModel ? 
+            `${variantTask.aiModels.scriptModel.provider}:${variantTask.aiModels.scriptModel.model}` : 'N/A',
+          imageModel: variantTask.aiModels.imageModel ? 
+            `${variantTask.aiModels.imageModel.provider}:${variantTask.aiModels.imageModel.model}` : 'N/A',
+          quizQuestionsModel: variantTask.aiModels.quizQuestionsModel ? 
+            `${variantTask.aiModels.quizQuestionsModel.provider}:${variantTask.aiModels.quizQuestionsModel.model}` : 'N/A',
+          quizPromptModel: variantTask.aiModels.quizPromptModel ? 
+            `${variantTask.aiModels.quizPromptModel.provider}:${variantTask.aiModels.quizPromptModel.model}` : 'N/A'
+        });
+      } else if (!session.aiModels || 
+                 (!session.aiModels.scriptModel?.provider && !session.aiModels.quizQuestionsModel?.provider)) {
+        console.warn(`⚠️ [METRICS] Could not find AI models for session ${sessionId}`);
+      }
     }
 
     // Stop session in vitals service (gracefully handle if service is unavailable)
@@ -272,12 +347,144 @@ router.post('/session/stop', async (req, res) => {
 
     await session.save();
 
+    // FEEDBACK PROCESSING PIPELINE
+    // Step 1: Normalize raw metrics into feedback signals
+    let feedback = null;
+    if (session.aggregatedMetrics) {
+      try {
+        // Get task context
+        const task = await Task.findById(session.task).populate('class');
+        const classData = await Class.findById(session.class);
+        
+        feedback = feedbackNormalizerService.normalize(
+          session.aggregatedMetrics,
+          {
+            taskType: session.taskType,
+            topic: task?.topic,
+            gradeLevel: session.gradeLevel,
+            subject: session.subject,
+            duration: session.duration
+          }
+        );
+
+        // Build agent combo string
+        const agentCombo = surveyMonkeyService.buildAgentComboString(
+          session.aiModels,
+          session.taskType
+        );
+
+        // Log if agent combo is unknown for debugging
+        if (agentCombo === 'unknown') {
+          console.warn('⚠️ [FEEDBACK] Agent combo is unknown - aiModels:', JSON.stringify(session.aiModels, null, 2));
+        }
+
+        // Add context to feedback
+        feedback.agentCombo = agentCombo;
+        feedback.topic = task?.topic || 'unknown';
+        feedback.taskType = session.taskType;
+        feedback.gradeLevel = session.gradeLevel;
+        feedback.subject = session.subject;
+        feedback.length = surveyMonkeyService.categorizeLength(session.duration);
+        feedback.sessionId = session._id;
+
+        // Calculate fatigue slope from metrics history
+        if (session.metrics.length >= 5) {
+          feedback.fatigueSlope = feedbackNormalizerService.calculateFatigueSlope(
+            session.metrics
+          );
+        }
+
+        // Step 2: Store feedback in MongoDB (feedback layer)
+        const sessionFeedback = new SessionFeedback({
+          sessionId: session._id,
+          clarityScore: feedback.clarityScore,
+          engagementScore: feedback.engagementScore,
+          fatigueTrend: feedback.fatigueTrend,
+          cognitiveLoad: feedback.cognitiveLoad,
+          attentionSpan: feedback.attentionSpan,
+          confidence: feedback.confidence,
+          fatigueSlope: feedback.fatigueSlope || 0,
+          agentCombo: agentCombo,
+          topic: feedback.topic,
+          taskType: feedback.taskType,
+          gradeLevel: feedback.gradeLevel,
+          subject: feedback.subject
+        });
+
+        await sessionFeedback.save();
+        console.log('✅ [FEEDBACK] Normalized feedback stored:', {
+          sessionId: session._id.toString().substring(0, 20) + '...',
+          clarity: feedback.clarityScore.toFixed(2),
+          engagement: feedback.engagementScore.toFixed(2),
+          fatigueTrend: feedback.fatigueTrend
+        });
+
+        // Step 3: Submit to Survey Monkey (async, don't block)
+        surveyMonkeyService.submitFeedback({
+          sessionId: session._id.toString(),
+          aggregatedMetrics: session.aggregatedMetrics,
+          aiModels: session.aiModels,
+          taskType: session.taskType,
+          topic: task?.topic,
+          gradeLevel: session.gradeLevel,
+          subject: session.subject,
+          duration: session.duration
+        }).then(surveyResult => {
+          if (surveyResult) {
+            sessionFeedback.surveyMonkeyResponseId = surveyResult.surveyResponseId;
+            sessionFeedback.surveySubmitted = true;
+            sessionFeedback.save();
+            console.log('✅ [SURVEYMONKEY] Feedback submitted:', surveyResult.surveyResponseId);
+          }
+        }).catch(err => {
+          console.error('[SURVEYMONKEY] Error submitting feedback:', err);
+        });
+
+        // Step 4: Update agent performance profile
+        agentSelectionService.updatePerformanceProfile(feedback)
+          .then(profile => {
+            console.log('✅ [AGENT_SELECTION] Performance profile updated:', {
+              agentCombo: profile.agentCombo,
+              performanceScore: profile.performanceScore.toFixed(2),
+              sessions: profile.sessionCount
+            });
+          })
+          .catch(err => {
+            console.error('[AGENT_SELECTION] Error updating profile:', err);
+          });
+
+        // Step 5: Send alerts for critical feedback
+        feedbackAlertService.alertVitalityCollapse(feedback, {
+          agentCombo,
+          topic: feedback.topic,
+          taskType: feedback.taskType,
+          sessionId: session._id.toString()
+        });
+
+        feedbackAlertService.alertCriticalThreshold(feedback, {
+          agentCombo,
+          topic: feedback.topic,
+          taskType: feedback.taskType,
+          sessionId: session._id.toString()
+        });
+
+      } catch (error) {
+        console.error('[FEEDBACK] Error processing feedback pipeline:', error);
+        // Don't fail the request - feedback processing is non-critical
+      }
+    }
+
     // Log final aggregated metrics
     console.log('📊 [METRICS] Session completed:', {
       sessionId: session._id.toString().substring(0, 20) + '...',
       duration: `${session.duration}s`,
       frames: session.metrics.length,
       aggregated: session.aggregatedMetrics,
+      feedback: feedback ? {
+        clarity: feedback.clarityScore?.toFixed(2),
+        engagement: feedback.engagementScore?.toFixed(2),
+        fatigueTrend: feedback.fatigueTrend
+      } : null,
       timestamp: new Date().toISOString()
     });
 
@@ -286,7 +493,13 @@ router.post('/session/stop', async (req, res) => {
       session: {
         id: session._id,
         duration: session.duration,
-        metrics: session.aggregatedMetrics
+        metrics: session.aggregatedMetrics,
+        feedback: feedback ? {
+          clarityScore: feedback.clarityScore,
+          engagementScore: feedback.engagementScore,
+          fatigueTrend: feedback.fatigueTrend,
+          confidence: feedback.confidence
+        } : null
       }
     });
   } catch (error) {
