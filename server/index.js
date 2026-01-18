@@ -64,14 +64,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!MONGODB_URI) {
-  console.error('❌ MONGODB_URI environment variable is not set!');
-  console.error('   Please set MONGODB_URI in your .env file or environment variables.');
-  console.error('   Example: MONGODB_URI=mongodb://localhost:27017/uottahack');
-  console.error('   Or for MongoDB Atlas: MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database');
-  process.exit(1);
-}
-
 // MongoDB connection options
 const mongooseOptions = {
   serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
@@ -80,41 +72,47 @@ const mongooseOptions = {
   w: 'majority'
 };
 
-mongoose.connect(MONGODB_URI, mongooseOptions)
-  .then(() => {
-    console.log('✅ Connected to MongoDB');
-    console.log(`   Database: ${mongoose.connection.name}`);
-  })
-  .catch((error) => {
-    console.error('❌ MongoDB connection error:', error.message);
-    
-    // Provide helpful error messages based on error type
-    if (error.code === 8000 || error.codeName === 'AtlasError') {
-      console.error('\n🔐 Authentication Error:');
-      console.error('   - Check your MongoDB username and password');
-      console.error('   - Verify your MongoDB Atlas user has proper permissions');
-      console.error('   - Ensure your IP address is whitelisted in MongoDB Atlas');
-      console.error('   - Check if your password contains special characters that need URL encoding');
-    } else if (error.message.includes('ECONNREFUSED')) {
-      console.error('\n🔌 Connection Refused:');
-      console.error('   - Check if MongoDB is running');
-      console.error('   - Verify the connection string host and port');
-      console.error('   - For local MongoDB: mongodb://localhost:27017/uottahack');
-    } else if (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo')) {
-      console.error('\n🌐 DNS/Network Error:');
-      console.error('   - Check your internet connection');
-      console.error('   - Verify the MongoDB hostname is correct');
-      console.error('   - For MongoDB Atlas, check if the cluster is accessible');
-    }
-    
-    console.error('\n💡 To fix:');
-    console.error('   1. Create a .env file in the project root');
-    console.error('   2. Add: MONGODB_URI=your_connection_string_here');
-    console.error('   3. Restart the server');
-    
-    // Don't exit the process - let the server start but operations will fail
-    // This allows the server to start even if MongoDB isn't available
-  });
+// Connect to MongoDB (non-blocking for Vercel builds)
+if (MONGODB_URI) {
+  mongoose.connect(MONGODB_URI, mongooseOptions)
+    .then(() => {
+      console.log('✅ Connected to MongoDB');
+      console.log(`   Database: ${mongoose.connection.name}`);
+    })
+    .catch((error) => {
+      console.error('❌ MongoDB connection error:', error.message);
+      
+      // Provide helpful error messages based on error type
+      if (error.code === 8000 || error.codeName === 'AtlasError') {
+        console.error('\n🔐 Authentication Error:');
+        console.error('   - Check your MongoDB username and password');
+        console.error('   - Verify your MongoDB Atlas user has proper permissions');
+        console.error('   - Ensure your IP address is whitelisted in MongoDB Atlas');
+        console.error('   - Check if your password contains special characters that need URL encoding');
+      } else if (error.message.includes('ECONNREFUSED')) {
+        console.error('\n🔌 Connection Refused:');
+        console.error('   - Check if MongoDB is running');
+        console.error('   - Verify the connection string host and port');
+        console.error('   - For local MongoDB: mongodb://localhost:27017/uottahack');
+      } else if (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo')) {
+        console.error('\n🌐 DNS/Network Error:');
+        console.error('   - Check your internet connection');
+        console.error('   - Verify the MongoDB hostname is correct');
+        console.error('   - For MongoDB Atlas, check if the cluster is accessible');
+      }
+      
+      console.error('\n💡 To fix:');
+      console.error('   1. Set MONGODB_URI in your environment variables');
+      console.error('   2. For Vercel: Add it in Project Settings → Environment Variables');
+      console.error('   3. Restart the server');
+      
+      // Don't exit the process - let the server start but operations will fail
+      // This allows the server to start even if MongoDB isn't available (important for Vercel builds)
+    });
+} else {
+  console.warn('⚠️  MONGODB_URI not set - MongoDB operations will fail');
+  console.warn('   Set MONGODB_URI in your environment variables for production');
+}
 
 // Initialize AI Router Service (SAM)
 aiRouterService.initialize().catch(err => {
@@ -161,8 +159,9 @@ app.post('/api/ai-router/config', async (req, res) => {
   }
 });
 
-// Serve static files from Vite build in production
-if (process.env.NODE_ENV === 'production') {
+// Don't serve static files in Vercel - Vercel handles this via rewrites
+// Only serve static files if running locally in production mode
+if (process.env.NODE_ENV === 'production' && process.env.VERCEL !== '1') {
   app.use(express.static(path.join(__dirname, '..', 'dist')));
   
   // Handle React Router - serve index.html for all non-API routes
